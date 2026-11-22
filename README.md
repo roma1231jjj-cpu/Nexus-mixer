@@ -219,7 +219,7 @@ src-tauri/
   src/lib.rs              Tauri commands, tray, updater plugins
   tauri.conf.json         window, bundle, updater endpoint
 
-.github/workflows/        CI and signed release
+docs/workflows/           CI and signed release recipes
 tools/ai-sidecar/         optional Python RVC sidecar
 docs/                     architecture, AI, driver, roadmap
 ```
