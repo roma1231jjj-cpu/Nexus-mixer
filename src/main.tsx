@@ -12,11 +12,12 @@ import './styles/theme.css'
 import './styles/guide.css'
 import './styles/studio.css'
 import './styles/console-v2.css'
+import './styles/glass.css'
 
 // Re-apply the persisted theme before the first paint. `?theme=light|dark`
 // keeps theme previews and screenshots deterministic.
 const requestedTheme = new URLSearchParams(window.location.search).get('theme')
-if (requestedTheme === 'light' || requestedTheme === 'dark') {
+if (requestedTheme === 'studio' || requestedTheme === 'light' || requestedTheme === 'dark') {
   // Deterministic preview: update runtime state and the DOM, but do not write
   // the preview theme back into the user's persisted settings.
   document.documentElement.dataset.theme = requestedTheme

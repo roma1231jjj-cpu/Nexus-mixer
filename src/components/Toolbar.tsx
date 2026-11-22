@@ -14,6 +14,7 @@ import {
   SlidersHorizontal,
   Sparkles,
   Sun,
+  Monitor,
 } from 'lucide-react'
 import { useMixer } from '../store/useMixer'
 import { useUi } from '../store/useUi'
@@ -230,12 +231,12 @@ export function Toolbar() {
       <button
         type="button"
         className="icon-btn"
-        aria-label={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}
-        data-tip={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}
+        aria-label="Сменить тему"
+        data-tip={`Тема: ${theme === 'studio' ? 'Nexus-Studio' : theme === 'dark' ? 'Nexus-Noir' : 'Nexus-Frost'} · нажмите, чтобы сменить`}
         data-tip-pos="bottom"
         onClick={toggleTheme}
       >
-        {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+        {theme === 'studio' ? <Monitor size={16} /> : theme === 'dark' ? <Moon size={16} /> : <Sun size={16} />}
       </button>
     </div>
   )

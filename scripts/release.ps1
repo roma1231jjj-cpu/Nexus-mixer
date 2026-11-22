@@ -63,11 +63,39 @@ $latestPath = Join-Path $nsisDir "latest.json"
 $json = $latest | ConvertTo-Json -Depth 5
 [IO.File]::WriteAllText($latestPath, $json, (New-Object System.Text.UTF8Encoding($false)))
 
-$portable = Join-Path $nsisDir "Nexus-Mixer-${version}-portable.zip"
+# Three distribution formats live together, separated from the working tree.
+$releaseDir = Join-Path $root "release/$tag"
+New-Item -ItemType Directory -Path $releaseDir -Force | Out-Null
+$portableExeName = "Nexus-Mixer_${version}_x64-portable.exe"
+$portableZipName = "Nexus-Mixer-${version}-portable.zip"
+$portableExe = Join-Path $releaseDir $portableExeName
+$portable = Join-Path $releaseDir $portableZipName
 $exe = Join-Path $root "src-tauri/target/release/nexus-mixer.exe"
-if (Test-Path $exe) {
-  Compress-Archive -Path $exe -DestinationPath $portable -Force
-}
+if (-not (Test-Path $exe)) { throw "portable executable not found: $exe" }
+Copy-Item $exe $portableExe -Force
+
+$portableReadme = Join-Path $releaseDir "README-PORTABLE.txt"
+@"
+Nexus-Mixer $version — Nexus × АутSquad
+Портативная сборка. Запустите $portableExeName. Установка не требуется.
+Для виртуальных кабелей нужен Virtual Audio Cable 4.70.
+"@ | Set-Content -Path $portableReadme -Encoding UTF8
+
+$portableStage = Join-Path $env:TEMP "nexus-portable-$version"
+if (Test-Path $portableStage) { Remove-Item $portableStage -Recurse -Force }
+New-Item -ItemType Directory -Path $portableStage | Out-Null
+Copy-Item $portableExe (Join-Path $portableStage "nexus-mixer.exe") -Force
+Copy-Item $portableReadme (Join-Path $portableStage "README-PORTABLE.txt") -Force
+Compress-Archive -Path (Join-Path $portableStage "*") -DestinationPath $portable -Force
+Remove-Item $portableStage -Recurse -Force
+
+Copy-Item $installer (Join-Path $releaseDir (Split-Path $installer -Leaf)) -Force
+Copy-Item $signature (Join-Path $releaseDir (Split-Path $signature -Leaf)) -Force
+Copy-Item $latestPath (Join-Path $releaseDir "latest.json") -Force
+Get-ChildItem $releaseDir -File | Where-Object { $_.Name -ne "SHA256SUMS.txt" } |
+  Get-FileHash -Algorithm SHA256 |
+  ForEach-Object { "$($_.Hash.ToLower())  $([IO.Path]::GetFileName($_.Path))" } |
+  Set-Content -Path (Join-Path $releaseDir "SHA256SUMS.txt") -Encoding ASCII
 
 $headers = @{
   Authorization = "Bearer $token"
@@ -92,8 +120,7 @@ try {
   Write-Host "Created release $tag" -ForegroundColor Green
 }
 
-$assets = @($installer, $signature, $latestPath)
-if (Test-Path $portable) { $assets += $portable }
+$assets = @($installer, $signature, $latestPath, $portableExe, $portable)
 
 foreach ($asset in $assets) {
   $name = Split-Path $asset -Leaf

@@ -40,6 +40,7 @@ export function TitleBar() {
         <span className="brand-name">
           Nexus<span>Mixer</span>
         </span>
+        <span className="brand-sign">Nexus × АутSquad</span>
       </div>
 
       <div className="titlebar-center" aria-hidden="true">

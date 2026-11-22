@@ -117,7 +117,8 @@ export const useMixer = create<MixerStore>()(
         set({ theme })
       },
       toggleTheme: () => {
-        const theme: Theme = get().theme === 'dark' ? 'light' : 'dark'
+        const order: Theme[] = ['studio', 'dark', 'light']
+        const theme = order[(order.indexOf(get().theme) + 1) % order.length]
         applyTheme(theme)
         set({ theme })
       },
@@ -421,8 +422,17 @@ export const useMixer = create<MixerStore>()(
     }),
     {
       name: 'nexus-mixer.state',
-      version: 2,
+      version: 3,
       storage: createJSONStorage(() => localStorage),
+      migrate: (persisted) => {
+        const state = persisted as { theme?: Theme }
+        // Saved 0.3.x builds used `dark` for the matte studio surface. Promote
+        // that save to the new explicit `studio` skin instead of surprising the
+        // user with the new glass skin after an update.
+        if (!state.theme || state.theme === 'dark') state.theme = 'studio'
+        if (state.theme !== 'studio' && state.theme !== 'light') state.theme = 'studio'
+        return state
+      },
       partialize: (state) => ({
         strips: state.strips,
         sourceCount: state.sourceCount,

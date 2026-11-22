@@ -43,6 +43,8 @@ src-tauri/driver/**/*.pdb
 src-tauri/driver/**/*.cer
 
 # release binaries and updater artefacts
+release/*
+!release/README.md
 *.exe
 *.msi
 *.nsis.zip

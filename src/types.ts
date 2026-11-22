@@ -6,7 +6,7 @@
  * Tauri bridge can forward it to the audio thread without custom serialization.
  */
 
-export type Theme = 'dark' | 'light'
+export type Theme = 'studio' | 'dark' | 'light'
 
 export type StripId = 'hw1' | 'hw2' | 'hw3' | 'hw4' | 'hw5' | 'hw6' | 'vaio' | 'aux'
 export type BusId = 'A1' | 'A2' | 'A3' | 'B1' | 'B2' | 'B3' | 'B4' | 'B5' | 'B6' | 'B7' | 'B8' | 'B9' | 'B10' | 'B11' | 'B12'

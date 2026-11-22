@@ -44,7 +44,7 @@ export function SettingsDrawer() {
           <Settings size={16} className="accent" />
           <div>
             <h2>Настройки</h2>
-            <div className="sub">Nexus-Mixer · v0.3.1</div>
+            <div className="sub">Nexus-Mixer · v0.4.0</div>
           </div>
           <button
             type="button"
@@ -302,12 +302,15 @@ export function SettingsDrawer() {
             </span>
             <div className="setting-row">
               <span className="s-label">Тема</span>
-              <div className="seg">
-                <button type="button" className={theme === 'dark' ? 'on' : ''} onClick={() => setTheme('dark')}>
-                  Тёмная
+              <div className="seg theme-switcher">
+                <button type="button" className={theme === 'studio' ? 'on' : ''} onClick={() => setTheme('studio')} title="Матовая приборная панель — текущий дизайн">
+                  Nexus-Studio
                 </button>
-                <button type="button" className={theme === 'light' ? 'on' : ''} onClick={() => setTheme('light')}>
-                  Светлая
+                <button type="button" className={theme === 'dark' ? 'on' : ''} onClick={() => setTheme('dark')} title="Чёрное стекло и фиолетовое свечение">
+                  Nexus-Noir
+                </button>
+                <button type="button" className={theme === 'light' ? 'on' : ''} onClick={() => setTheme('light')} title="Белое стекло и синий акцент">
+                  Nexus-Frost
                 </button>
               </div>
             </div>
@@ -361,7 +364,7 @@ export function SettingsDrawer() {
               </p>
               <div className="about-meta">
                 <span>Nexus × АутSquad</span>
-                <span>0.3.1 · Tauri 2 · Rust</span>
+                <span>0.4.0 · Tauri 2 · Rust</span>
               </div>
               <button
                 type="button"

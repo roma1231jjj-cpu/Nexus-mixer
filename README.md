@@ -1,32 +1,64 @@
 # Nexus-Mixer
 
 **Студийная аудиоконсоль для Windows: 8 источников, 15 шин и 12 виртуальных кабелей.**
-Микрофон, музыка, браузер, игры и Discord — в одном матовом микшере с DSP-цепочками,
-маршрутизацией и голосовыми эффектами в реальном времени.
+Микрофон, музыка, браузер, игры и Discord — в одной консоли с DSP, маршрутизацией
+и голосовыми эффектами в реальном времени.
 
-[![Release](https://img.shields.io/github/v/release/roma1231jjj-cpu/Nexus-mixer?style=flat-square&label=release&color=b08a54)](https://github.com/roma1231jjj-cpu/Nexus-mixer/releases/latest)
+[![Release](https://img.shields.io/github/v/release/roma1231jjj-cpu/Nexus-mixer?style=flat-square&label=release&color=8b5cf6)](https://github.com/roma1231jjj-cpu/Nexus-mixer/releases/latest)
 [![Tests](https://img.shields.io/badge/tests-54%20passed-2ea043?style=flat-square)](#тесты)
 [![Windows](https://img.shields.io/badge/platform-Windows%2010%2F11-4b5563?style=flat-square)](#установка)
 [![Tauri](https://img.shields.io/badge/Tauri-2-24c8db?style=flat-square)](https://tauri.app)
 [![Rust](https://img.shields.io/badge/Rust-realtime-b7410e?style=flat-square)](https://www.rust-lang.org)
 
-> **Nexus × АутSquad** · v0.3.1 · Windows 10/11 x64
+> **Nexus × АутSquad** · v0.4.0 · Windows 10/11 x64
 
-![Nexus-Mixer — главная консоль](.shots/premium-final-dark.png)
+![Nexus-Mixer — Nexus-Noir](.shots/nexus-noir-0.4.0.png)
+
+---
+
+## Три характера
+
+Одна консоль, три оптики. Переключение — в тулбаре или в
+**Настройки → Интерфейс и поведение**.
+
+| **Nexus-Studio** | **Nexus-Noir** | **Nexus-Frost** |
+| --- | --- | --- |
+| Матовая приборная панель | Чёрное стекло · фиолет | Белое стекло · синий |
+| ![](.shots/nexus-studio-0.4.0.png) | ![](.shots/nexus-noir-0.4.0.png) | ![](.shots/nexus-frost-0.4.0.png) |
+
+Каждая тема — это не просто смена цвета: пересобраны контраст текста,
+границы, свечение, фейдеры, метры, селекторы устройств и модальные окна.
+Стеклянные панели используют полупрозрачность, blur и мягкий контур, но
+сохраняют «приборный» характер: без аврор, неона и декоративного шума.
+
+---
+
+## Что нового в 0.4.0
+
+- **Nexus-Studio** — привычная матовая тема сохранена как отдельный скин.
+- **Nexus-Noir** — чёрно-фиолетовое стекло с glow-границами.
+- **Nexus-Frost** — бело-синее стекло для светлого рабочего места.
+- **Три формата поставки** — установщик, одиночный portable `.exe`, portable `.zip`.
+- **Подпись Nexus × АутSquad** в титлбаре.
+- Портативный `.exe` работает без папки `resources` — скрипт кабелей встроен.
+- Старые сохранения мигрируют в **Nexus-Studio**, чтобы обновление не меняло
+  привычный вид консоли само по себе.
+
+Полный список — в [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
 ## Что это
 
-Nexus-Mixer встаёт между микрофоном, приложениями и устройствами вывода. Он собирает
-весь звук в один микшер, обрабатывает каждый канал, раздаёт его по физическим и
-виртуальным шинам — и отдаёт Discord, OBS, Zoom и играм как обычный микрофон.
+Nexus-Mixer встаёт между микрофоном, приложениями и устройствами вывода. Он
+собирает звук в один микшер, обрабатывает каждый канал, раздаёт его по физическим
+и виртуальным шинам — и отдаёт Discord, OBS, Zoom и играм как обычный микрофон.
 
 - **8 входов** — 6 аппаратных + 2 виртуальных.
 - **3 физических выхода** — наушники, вторая пара, колонки.
 - **12 независимых виртуальных кабелей** — VAC 4.70, линии `Nexus Cable B1…B12`.
 - **Матрица 8 × 15** с уровнем посыла.
-- **Настоящий realtime-движок** на Rust/WASAPI, а не Web Audio.
+- **Realtime-движок Rust/WASAPI**, а не Web Audio.
 - **Локальные голосовые пресеты** — работают сразу, без Python и скачивания моделей.
 
 ---
@@ -38,7 +70,7 @@ Nexus-Mixer встаёт между микрофоном, приложениям
 | | |
 | --- | --- |
 | Источники | `hw1…hw6`, `vaio`, `aux` — 8 слотов, 5 видны по умолчанию |
-| Выходы | `A1` наушники, `A2` наушники 2, `A3` колонки, `B1…B12` виртуальные кабели |
+| Выходы | `A1` наушники, `A2` наушники 2, `A3` колонки, `B1…B12` кабели |
 | Канал | gain, pan, phase, mono, mute, solo, 48V, tilt |
 | Шина | EQ, limiter, delay 0–500 мс, stereo width 0–200 %, dim |
 | Маршрутизация | клик — вкл/выкл, drag — уровень, клавиатура — доступно |
@@ -92,40 +124,35 @@ Nexus-Mixer встаёт между микрофоном, приложениям
 - Макросы и горячие клавиши.
 - MIDI Learn через Web MIDI.
 - Undo/Redo для FX.
-- Тёмная и светлая темы, сохранение состояния.
-- Кастомный frameless titlebar.
-- Deep links: `?tab=ai`, `?strip=hw1`, `?bus=B1`, `?theme=light`, `?drawer=settings`.
+- Сохранение состояния, кастомный frameless titlebar.
+- Deep links: `?tab=ai`, `?strip=hw1`, `?bus=B1`, `?theme=studio|dark|light`, `?drawer=settings`.
 
 ---
 
-## Скриншоты
+## Скачать
 
-| Консоль | Голосовые пресеты |
-| --- | --- |
-| ![](.shots/premium-final-dark.png) | ![](.shots/premium-ai-dark.png) |
+Все сборки лежат на [GitHub Releases](https://github.com/roma1231jjj-cpu/Nexus-mixer/releases/latest)
+и разделены по версиям.
 
-| Матрица | Светлая тема |
-| --- | --- |
-| ![](.shots/premium-matrix-dark.png) | ![](.shots/premium-light.png) |
+| Формат | Файл | Для чего |
+| --- | --- | --- |
+| Установщик | `Nexus-Mixer_0.4.0_x64-setup.exe` | обычная установка, автообновление |
+| Одиночный portable | `Nexus-Mixer_0.4.0_x64-portable.exe` | запуск без установки |
+| Portable-архив | `Nexus-Mixer-0.4.0-portable.zip` | portable `.exe` + README |
 
----
+Внутри проекта артефакты складываются в `release/vX.Y.Z/` и не смешиваются с
+рабочими файлами. Структура описана в [release/README.md](release/README.md).
 
-## Установка
-
-### Готовый установщик
+### Установка
 
 1. Откройте [последний релиз](https://github.com/roma1231jjj-cpu/Nexus-mixer/releases/latest).
-2. Скачайте `Nexus-Mixer_0.3.1_x64-setup.exe`.
-3. Запустите установщик. Установка в `%LOCALAPPDATA%` или выбранную папку.
-4. Запустите **Nexus-Mixer** из меню «Пуск».
+2. Скачайте установщик или portable-сборку.
+3. Запустите **Nexus-Mixer**.
+4. Для виртуальных кабелей установите **Virtual Audio Cable 4.70** (12 линий).
+   Без него физические выходы работают, но виртуальные шины будут недоступны.
 
-Для виртуальных кабелей нужен **Virtual Audio Cable 4.70** (12 линий). Без него
-физические выходы работают, но виртуальные шины будут недоступны.
-
-### Портативная версия
-
-Скачайте `Nexus-Mixer-0.3.1-portable.zip`, распакуйте и запустите `nexus-mixer.exe`.
-Портативная сборка не устанавливает автообновление — обновляйте вручную.
+Установщик ставит приложение в `%LOCALAPPDATA%` (или выбранную папку) и
+поддерживает автообновление. Portable-сборка обновляется вручную.
 
 ---
 
@@ -145,12 +172,20 @@ npm run desktop:build  # release NSIS
 ```powershell
 $env:TAURI_SIGNING_PRIVATE_KEY = "C:\path\to\nexus-updater.key"
 $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = ""
-npx tauri build --no-bundle   # exe для установки/портативной версии
+npx tauri build --no-bundle    # raw exe для portable
 npx tauri build --bundles nsis # NSIS + .sig + latest.json
 ```
 
-> Для обычной локальной сборки без автообновления можно временно выставить
-> `"createUpdaterArtifacts": false` в `src-tauri/tauri.conf.json`.
+Или одной командой:
+
+```powershell
+$env:GITHUB_TOKEN = "..."
+$env:TAURI_SIGNING_PRIVATE_KEY = "C:\path\to\nexus-updater.key"
+powershell -ExecutionPolicy Bypass -File scripts/release.ps1
+```
+
+Скрипт собирает три формата, кладёт их в `release/vX.Y.Z/`, считает SHA-256,
+создаёт GitHub Release и загружает `latest.json` для автообновления.
 
 ### Тесты
 
@@ -161,6 +196,17 @@ cargo test --all-targets
 
 54 теста движка: DSP, маршрутизация, VCA, метры, лимитер, рекордер, локальный
 голосовой pitch-shifter.
+
+---
+
+## Версии
+
+| Версия | Что важно |
+| --- | --- |
+| **0.4.0** | Nexus-Studio / Nexus-Noir / Nexus-Frost, 3 формата поставки |
+| 0.3.1 | проверенное сквозное автообновление |
+| 0.3.0 | локальные голоса, updater, GitHub Releases |
+| 0.2.1 | 12 кабелей VAC, бархатная цепочка, стабильный старт движка |
 
 ---
 
@@ -178,20 +224,14 @@ cargo test --all-targets
 Релиз создаётся тегом:
 
 ```powershell
-# локальный подписанный релиз (без GitHub Actions)
-powershell -ExecutionPolicy Bypass -File scripts/release.ps1
+git tag v0.4.0
+git push origin v0.4.0
 ```
 
-Или после добавления workflow в `.github/workflows`:
+Секреты репозитория:
 
-```powershell
-git tag v0.3.1
-git push origin v0.3.1
-```
-
-Нужные секреты репозитория:
-
-| Secret | Значение |
+| Secret
+ | Значение |
 | --- | --- |
 | `TAURI_SIGNING_PRIVATE_KEY` | содержимое `nexus-updater.key` |
 
@@ -206,11 +246,11 @@ src/
   App.tsx                 каркас, deep links, auto-update check
   components/             Strip, Bus, RoutingMatrix, UpdateBanner, SettingsDrawer
   components/rack/        FX, Voice AI, Macros, Recorder, VCA Groups
-  store/useMixer.ts       zustand + persist
+  store/useMixer.ts       zustand + persist + theme migration
   store/useUpdater.ts     Tauri updater state machine
   lib/engineBridge.ts     typed invoke bridge
   lib/useEngineBridge.ts  sync, meters, device hot-plug
-  styles/                 studio.css + console-v2.css
+  styles/                 studio.css + console-v2.css + glass.css
 
 src-tauri/
   src/engine/             realtime graph, WASAPI runtime, DSP, recorder
@@ -219,6 +259,7 @@ src-tauri/
   src/lib.rs              Tauri commands, tray, updater plugins
   tauri.conf.json         window, bundle, updater endpoint
 
+release/vX.Y.Z/           installer + portable exe + zip + latest.json
 docs/workflows/           CI and signed release recipes
 tools/ai-sidecar/         optional Python RVC sidecar
 docs/                     architecture, AI, driver, roadmap
@@ -258,7 +299,7 @@ WASAPI input → strip gain/pan → gate → compressor → EQ
 - Встроенные голоса — DSP-эффекты, а не нейросетевой клон голоса. RVC-модели
   подключаются через sidecar.
 - Рекордер пишет WAV; FLAC/MP3 — в roadmap.
-- Портативная сборка не содержит автообновление.
+- Portable-сборка не устанавливает автообновление — обновляйте вручную.
 
 ---
 

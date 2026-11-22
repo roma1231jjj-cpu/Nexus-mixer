@@ -143,13 +143,25 @@ fn get_driver_status(state: SharedEngine<'_>) -> DriverStatus {
 /// whose friendly name contains "cable" or "nexus".
 #[tauri::command]
 fn rename_virtual_cables(app: AppHandle) -> Result<String, String> {
-    let script: PathBuf = if cfg!(debug_assertions) {
+    let bundled_script: PathBuf = if cfg!(debug_assertions) {
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/rename-cables.ps1")
     } else {
         app.path()
             .resource_dir()
             .map_err(|error| format!("Не найден каталог ресурсов: {error}"))?
             .join("resources/rename-cables.ps1")
+    };
+
+    // The portable build is a single .exe with no resources directory. Keep the
+    // cable-rename action functional there by materialising the embedded script
+    // into %TEMP% on first use.
+    let script = if bundled_script.exists() {
+        bundled_script
+    } else {
+        let fallback = std::env::temp_dir().join("nexus-rename-cables.ps1");
+        std::fs::write(&fallback, include_str!("../resources/rename-cables.ps1"))
+            .map_err(|error| format!("Не удалось подготовить скрипт переименования: {error}"))?;
+        fallback
     };
 
     if !script.exists() {
