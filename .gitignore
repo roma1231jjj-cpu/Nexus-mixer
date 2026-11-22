@@ -49,3 +49,7 @@ src-tauri/driver/**/*.cer
 *.sig
 *.key
 latest.json
+
+# python
+__pycache__/
+*.pyc

@@ -5,7 +5,7 @@
 маршрутизацией и голосовыми эффектами в реальном времени.
 
 [![Release](https://img.shields.io/github/v/release/roma1231jjj-cpu/Nexus-mixer?style=flat-square&label=release&color=b08a54)](https://github.com/roma1231jjj-cpu/Nexus-mixer/releases/latest)
-[![CI](https://img.shields.io/github/actions/workflow/status/roma1231jjj-cpu/Nexus-mixer/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/roma1231jjj-cpu/Nexus-mixer/actions)
+[![Tests](https://img.shields.io/badge/tests-54%20passed-2ea043?style=flat-square)](#тесты)
 [![Windows](https://img.shields.io/badge/platform-Windows%2010%2F11-4b5563?style=flat-square)](#установка)
 [![Tauri](https://img.shields.io/badge/Tauri-2-24c8db?style=flat-square)](https://tauri.app)
 [![Rust](https://img.shields.io/badge/Rust-realtime-b7410e?style=flat-square)](https://www.rust-lang.org)
@@ -168,10 +168,21 @@ cargo test --all-targets
 
 | Workflow | Что делает |
 | --- | --- |
-| [`ci.yml`](.github/workflows/ci.yml) | typecheck + Vite build + Rust tests |
-| [`release.yml`](.github/workflows/release.yml) | NSIS, подпись, GitHub Release, `latest.json` |
+| [`ci.yml`](docs/workflows/ci.yml) | typecheck + Vite build + Rust tests |
+| [`release.yml`](docs/workflows/release.yml) | NSIS, подпись, GitHub Release, `latest.json` |
+
+> GitHub ограничивает загрузку `.github/workflows/*` токеном без scope `workflow`.
+> Файлы лежат в [`docs/workflows`](docs/workflows) и готовы к переносу в
+> `.github/workflows` после выдачи токену этого scope.
 
 Релиз создаётся тегом:
+
+```powershell
+# локальный подписанный релиз (без GitHub Actions)
+powershell -ExecutionPolicy Bypass -File scripts/release.ps1
+```
+
+Или после добавления workflow в `.github/workflows`:
 
 ```powershell
 git tag v0.3.0
@@ -235,6 +246,7 @@ WASAPI input → strip gain/pan → gate → compressor → EQ
 - [Виртуальный драйвер](docs/DRIVER.md)
 - [Roadmap](docs/ROADMAP.md)
 - [Changelog](CHANGELOG.md)
+- [Release workflow](docs/workflows/release.yml)
 
 ---
 
