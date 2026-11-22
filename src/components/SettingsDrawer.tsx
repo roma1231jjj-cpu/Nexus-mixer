@@ -44,7 +44,7 @@ export function SettingsDrawer() {
           <Settings size={16} className="accent" />
           <div>
             <h2>Настройки</h2>
-            <div className="sub">Nexus-Mixer · v0.3.0</div>
+            <div className="sub">Nexus-Mixer · v0.3.1</div>
           </div>
           <button
             type="button"
@@ -361,7 +361,7 @@ export function SettingsDrawer() {
               </p>
               <div className="about-meta">
                 <span>Nexus × АутSquad</span>
-                <span>0.3.0 · Tauri 2 · Rust</span>
+                <span>0.3.1 · Tauri 2 · Rust</span>
               </div>
               <button
                 type="button"

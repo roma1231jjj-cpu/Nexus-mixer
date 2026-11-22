@@ -10,7 +10,7 @@
 [![Tauri](https://img.shields.io/badge/Tauri-2-24c8db?style=flat-square)](https://tauri.app)
 [![Rust](https://img.shields.io/badge/Rust-realtime-b7410e?style=flat-square)](https://www.rust-lang.org)
 
-> **Nexus × АутSquad** · v0.3.0 · Windows 10/11 x64
+> **Nexus × АутSquad** · v0.3.1 · Windows 10/11 x64
 
 ![Nexus-Mixer — главная консоль](.shots/premium-final-dark.png)
 
@@ -115,7 +115,7 @@ Nexus-Mixer встаёт между микрофоном, приложениям
 ### Готовый установщик
 
 1. Откройте [последний релиз](https://github.com/roma1231jjj-cpu/Nexus-mixer/releases/latest).
-2. Скачайте `Nexus-Mixer_0.3.0_x64-setup.exe`.
+2. Скачайте `Nexus-Mixer_0.3.1_x64-setup.exe`.
 3. Запустите установщик. Установка в `%LOCALAPPDATA%` или выбранную папку.
 4. Запустите **Nexus-Mixer** из меню «Пуск».
 
@@ -124,7 +124,7 @@ Nexus-Mixer встаёт между микрофоном, приложениям
 
 ### Портативная версия
 
-Скачайте `Nexus-Mixer-0.3.0-portable.zip`, распакуйте и запустите `nexus-mixer.exe`.
+Скачайте `Nexus-Mixer-0.3.1-portable.zip`, распакуйте и запустите `nexus-mixer.exe`.
 Портативная сборка не устанавливает автообновление — обновляйте вручную.
 
 ---
@@ -185,8 +185,8 @@ powershell -ExecutionPolicy Bypass -File scripts/release.ps1
 Или после добавления workflow в `.github/workflows`:
 
 ```powershell
-git tag v0.3.0
-git push origin v0.3.0
+git tag v0.3.1
+git push origin v0.3.1
 ```
 
 Нужные секреты репозитория:
