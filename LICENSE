@@ -1,0 +1,28 @@
+Nexus-Mixer — Proprietary License
+Copyright (c) 2026 Nexus × АутSquad. All rights reserved.
+
+This repository and its source code, assets, documentation and build artefacts
+are published for transparency and collaborative development.
+
+You may:
+  - read, study and fork the source code for personal, non-commercial use;
+  - submit pull requests and issues to the upstream repository.
+
+You may not, without prior written permission from the copyright holders:
+  - use the software or its source code commercially;
+  - redistribute modified builds under the Nexus-Mixer name or branding;
+  - remove or alter copyright, licence or attribution notices;
+  - sell, sublicense, rent or bundle the software with a commercial product.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+Third-party components keep their own licences:
+  - Tauri, React, Rust crates — MIT / Apache-2.0;
+  - Virtual Audio Cable — EuMus Design, separate commercial licence;
+  - RVC sidecar models — their respective model licences.

@@ -1,0 +1,45 @@
+name: Bug report
+description: Что-то сломалось в Nexus-Mixer
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Спасибо за отчёт. Приложите версию, Windows и шаги воспроизведения.
+  - type: input
+    id: version
+    attributes:
+      label: Версия Nexus-Mixer
+      placeholder: 0.3.1
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows
+      placeholder: Windows 11 24H2, x64
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Шаги воспроизведения
+      placeholder: |
+        1. Открыть Voice
+        2. Выбрать «Монстр»
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Ожидаемое поведение
+  - type: textarea
+    id: actual
+    attributes:
+      label: Фактическое поведение
+  - type: textarea
+    id: logs
+    attributes:
+      label: Логи / скриншоты
+      description: Перетащите файлы сюда. Не прикладывайте приватные токены.

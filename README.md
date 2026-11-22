@@ -194,7 +194,6 @@ git push origin v0.3.1
 | Secret | Значение |
 | --- | --- |
 | `TAURI_SIGNING_PRIVATE_KEY` | содержимое `nexus-updater.key` |
-| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | пароль ключа (пустой, если ключ без пароля) |
 
 `GITHUB_TOKEN` выдаётся Actions автоматически.
 
@@ -247,6 +246,8 @@ WASAPI input → strip gain/pan → gate → compressor → EQ
 - [Roadmap](docs/ROADMAP.md)
 - [Changelog](CHANGELOG.md)
 - [Release workflow](docs/workflows/release.yml)
+- [Лицензия](LICENSE)
+- [Безопасность](SECURITY.md)
 
 ---
 
