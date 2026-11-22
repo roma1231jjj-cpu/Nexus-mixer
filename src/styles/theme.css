@@ -1,0 +1,104 @@
+/* ==========================================================================
+   Theme v4 — neutral console surfaces, hardware typography
+   Reference language: Linear (hairlines, restraint), Teenage Engineering
+   (micro-labels, instrument ticks), plus a signal-flow accent of our own.
+   ========================================================================== */
+
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #07080a;
+  --bg-2: #0a0c10;
+  --panel: rgba(26, 29, 36, 0.95);
+  --panel-strong: rgba(31, 34, 42, 0.97);
+  --panel-solid: #1a1d24;
+  --panel-inset: rgba(0, 0, 0, 0.34);
+
+  --stroke: rgba(255, 255, 255, 0.09);
+  --stroke-soft: rgba(255, 255, 255, 0.055);
+  --stroke-strong: rgba(255, 255, 255, 0.19);
+
+  --text: #f6f7f9;
+  --text-dim: #cbd0d8;
+  --muted: #969ca7;
+  --faint: #6a707b;
+
+  --accent: #8b5cf6;
+  --accent-bright: #a78bfa;
+  --accent-deep: #6d28d9;
+
+  --highlight: rgba(255, 255, 255, 0.05);
+  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.45), 0 10px 26px -22px rgba(0, 0, 0, 0.9);
+  --shadow: 0 28px 70px -34px rgba(0, 0, 0, 0.9);
+
+  --aurora-1: rgba(124, 58, 237, 0.2);
+  --aurora-2: rgba(56, 189, 248, 0.07);
+  --aurora-3: rgba(236, 72, 153, 0.07);
+
+  --track: rgba(255, 255, 255, 0.08);
+  --track-strong: rgba(255, 255, 255, 0.15);
+
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 9px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+}
+
+:root[data-theme='light'] {
+  --bg: #eef0f4;
+  --bg-2: #f8f9fb;
+  --panel: rgba(255, 255, 255, 0.88);
+  --panel-strong: rgba(255, 255, 255, 0.96);
+  --panel-solid: #ffffff;
+  --panel-inset: rgba(15, 18, 24, 0.05);
+
+  --stroke: rgba(15, 18, 24, 0.11);
+  --stroke-soft: rgba(15, 18, 24, 0.06);
+  --stroke-strong: rgba(15, 18, 24, 0.22);
+
+  --text: #0f1115;
+  --text-dim: #333840;
+  --muted: #626874;
+  --faint: #939aa6;
+
+  --accent: #2563eb;
+  --accent-bright: #3b82f6;
+  --accent-deep: #1d4ed8;
+
+  --highlight: rgba(255, 255, 255, 0.9);
+  --shadow-soft: 0 1px 2px rgba(15, 23, 42, 0.06), 0 10px 24px -22px rgba(15, 23, 42, 0.5);
+  --shadow: 0 28px 70px -34px rgba(15, 23, 42, 0.4);
+
+  --aurora-1: rgba(96, 165, 250, 0.16);
+  --aurora-2: rgba(37, 99, 235, 0.08);
+  --aurora-3: rgba(147, 197, 253, 0.14);
+
+  --track: rgba(15, 18, 24, 0.1);
+  --track-strong: rgba(15, 18, 24, 0.18);
+}
+
+/* The console is the subject: keep the backdrop almost still. */
+body {
+  background:
+    radial-gradient(1200px 540px at 50% -8%, rgba(255, 255, 255, 0.055), transparent 70%),
+    var(--bg);
+}
+
+:root[data-theme='light'] body {
+  background:
+    radial-gradient(1200px 540px at 50% -8%, rgba(255, 255, 255, 0.9), transparent 70%),
+    var(--bg);
+}
+
+.aurora {
+  opacity: 0.8;
+}
+
+.brand-watermark {
+  opacity: 0.07;
+}
+
+.aurora-grain {
+  opacity: 0.2;
+}

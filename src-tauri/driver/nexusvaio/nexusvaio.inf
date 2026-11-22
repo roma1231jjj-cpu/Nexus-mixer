@@ -1,0 +1,184 @@
+;--------------------------------------------------------------------------
+; nexusvaio.inf - Installation file for Nexus VAIO Virtual Audio Driver
+;
+; Installs a PortCls (WDM) audio adapter with two ROOT-enumerated device
+; instances, each presenting a WaveRT render subdevice ("WaveSpeaker") and a
+; Topology subdevice ("TopologySpeaker"):
+;   - Nexus VAIO   @ Root\NexusVAIO
+;   - Nexus AUX    @ Root\NexusAUX
+;
+; Copyright (c) 2024-2025 Nexus VAIO. All rights reserved.
+;--------------------------------------------------------------------------
+
+[Version]
+Signature   = "$Windows NT$"
+Class       = MEDIA
+ClassGuid   = {4d36e96c-e325-11ce-bfc1-08002be10318}
+Provider    = %NexusVAIO%
+DriverVer   = 02/15/2025,1.0.0.0
+CatalogFile = nexusvaio.cat
+PnpLockDown = 1
+
+[SourceDisksNames]
+222 = "Nexus VAIO Driver Disk","",222
+
+[SourceDisksFiles]
+nexusvaio.sys = 222
+
+[DestinationDirs]
+NEXUSVAIO_Device.CopyFiles = 12        ; DIRID_DRIVERS
+NEXUSAUX_Device.CopyFiles  = 12
+
+;--------------------------------------------------------------------------
+; Manufacturer and Models
+;--------------------------------------------------------------------------
+
+[Manufacturer]
+%NexusVAIO% = NexusVAIO, NTamd64
+
+[NexusVAIO.NTamd64]
+%NexusVAIO.DeviceDesc% = NEXUSVAIO_Device, Root\NexusVAIO
+%NexusAUX.DeviceDesc%  = NEXUSAUX_Device,  Root\NexusAUX
+
+;--------------------------------------------------------------------------
+; Nexus VAIO (render endpoint)
+;--------------------------------------------------------------------------
+
+[NEXUSVAIO_Device.NT]
+Include   = ks.inf, wdmaudio.inf
+Needs     = KS.Registration, WDMAUDIO.Registration
+CopyFiles = NEXUSVAIO_Device.CopyFiles
+AddReg    = NEXUSVAIO_Device.AddReg, AUDIOHW.AddReg
+
+[NEXUSVAIO_Device.CopyFiles]
+nexusvaio.sys
+
+[NEXUSVAIO_Device.AddReg]
+HKR,,AssociatedFilters,,"wdmaud,swmidi,redbook"
+HKR,,Driver,,nexusvaio.sys
+
+[NEXUSVAIO_Device.NT.Interfaces]
+AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_WaveSpeaker%,NEXUSVAIO.I.WaveSpeaker
+AddInterface=%KSCATEGORY_RENDER%,%KSNAME_WaveSpeaker%,NEXUSVAIO.I.WaveSpeaker
+AddInterface=%KSCATEGORY_REALTIME%,%KSNAME_WaveSpeaker%,NEXUSVAIO.I.WaveSpeaker
+AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_TopologySpeaker%,NEXUSVAIO.I.TopologySpeaker
+AddInterface=%KSCATEGORY_TOPOLOGY%,%KSNAME_TopologySpeaker%,NEXUSVAIO.I.TopologySpeaker
+
+[NEXUSVAIO.I.WaveSpeaker]
+AddReg=NEXUSVAIO.I.WaveSpeaker.AddReg
+
+[NEXUSVAIO.I.WaveSpeaker.AddReg]
+HKR,,CLSID,,%Proxy.CLSID%
+HKR,,FriendlyName,,%NexusVAIO.RenderName%
+
+[NEXUSVAIO.I.TopologySpeaker]
+AddReg=NEXUSVAIO.I.TopologySpeaker.AddReg
+
+[NEXUSVAIO.I.TopologySpeaker.AddReg]
+HKR,,CLSID,,%Proxy.CLSID%
+HKR,,FriendlyName,,%NexusVAIO.TopologyName%
+
+HKR,EP\0,%PKEY_AudioEndpoint_Association%,,%KSNODETYPE_ANY%
+
+[NEXUSVAIO_Device.NT.Services]
+AddService = nexusvaio, 0x00000002, NEXUSVAIO_Service_Inst
+
+[NEXUSVAIO_Device.NT.HW]
+AddReg = AUDIOHW.AddReg
+
+;--------------------------------------------------------------------------
+; Nexus AUX (render endpoint)
+;--------------------------------------------------------------------------
+
+[NEXUSAUX_Device.NT]
+Include   = ks.inf, wdmaudio.inf
+Needs     = KS.Registration, WDMAUDIO.Registration
+CopyFiles = NEXUSAUX_Device.CopyFiles
+AddReg    = NEXUSAUX_Device.AddReg, AUDIOHW.AddReg
+
+[NEXUSAUX_Device.CopyFiles]
+nexusvaio.sys
+
+[NEXUSAUX_Device.AddReg]
+HKR,,AssociatedFilters,,"wdmaud,swmidi,redbook"
+HKR,,Driver,,nexusvaio.sys
+
+[NEXUSAUX_Device.NT.Interfaces]
+AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_WaveSpeaker%,NEXUSAUX.I.WaveSpeaker
+AddInterface=%KSCATEGORY_RENDER%,%KSNAME_WaveSpeaker%,NEXUSAUX.I.WaveSpeaker
+AddInterface=%KSCATEGORY_REALTIME%,%KSNAME_WaveSpeaker%,NEXUSAUX.I.WaveSpeaker
+AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_TopologySpeaker%,NEXUSAUX.I.TopologySpeaker
+AddInterface=%KSCATEGORY_TOPOLOGY%,%KSNAME_TopologySpeaker%,NEXUSAUX.I.TopologySpeaker
+
+[NEXUSAUX.I.WaveSpeaker]
+AddReg=NEXUSAUX.I.WaveSpeaker.AddReg
+
+[NEXUSAUX.I.WaveSpeaker.AddReg]
+HKR,,CLSID,,%Proxy.CLSID%
+HKR,,FriendlyName,,%NexusAUX.RenderName%
+
+[NEXUSAUX.I.TopologySpeaker]
+AddReg=NEXUSAUX.I.TopologySpeaker.AddReg
+
+[NEXUSAUX.I.TopologySpeaker.AddReg]
+HKR,,CLSID,,%Proxy.CLSID%
+HKR,,FriendlyName,,%NexusAUX.TopologyName%
+
+HKR,EP\0,%PKEY_AudioEndpoint_Association%,,%KSNODETYPE_ANY%
+
+[NEXUSAUX_Device.NT.Services]
+AddService = nexusvaio, 0x00000002, NEXUSVAIO_Service_Inst
+
+[NEXUSAUX_Device.NT.HW]
+AddReg = AUDIOHW.AddReg
+
+;--------------------------------------------------------------------------
+; Common sections
+;--------------------------------------------------------------------------
+
+[NEXUSVAIO_Service_Inst]
+DisplayName = %NexusVAIO.ServiceName%
+ServiceType = 1            ; SERVICE_KERNEL_DRIVER
+StartType   = 3            ; SERVICE_DEMAND_START
+ErrorControl= 1            ; SERVICE_ERROR_NORMAL
+ServiceBinary = %12%\nexusvaio.sys
+LoadOrderGroup = Port Class
+
+[AUDIOHW.AddReg]
+; FILE_DEVICE_SOUND
+HKR,,DeviceType,0x10001,0x0000001D
+; SDDL_DEVOBJ_SYS_ALL_ADM_RWX_WORLD_RWX_RES_RWX
+HKR,,Security,,"D:P(A;;GA;;;SY)(A;;GRGWGX;;;BA)(A;;GRGWGX;;;WD)(A;;GRGWGX;;;RC)"
+
+;--------------------------------------------------------------------------
+; Strings
+;--------------------------------------------------------------------------
+
+[Strings]
+
+; Non-localizable
+KSNAME_WaveSpeaker      = "WaveSpeaker"
+KSNAME_TopologySpeaker  = "TopologySpeaker"
+
+Proxy.CLSID             = "{17CCA71B-ECD7-11D0-B908-00A0C9223196}"
+KSCATEGORY_AUDIO        = "{6994AD04-93EF-11D0-A3CC-00A0C9223196}"
+KSCATEGORY_RENDER       = "{65E8773E-8F56-11D0-A3B9-00A0C9223196}"
+KSCATEGORY_REALTIME     = "{EB115FFC-10C8-4964-831D-6DCB02E6F23F}"
+KSCATEGORY_TOPOLOGY     = "{DDA54A40-1E4C-11D1-A050-405705C10000}"
+
+KSNODETYPE_ANY          = "{00000000-0000-0000-0000-000000000000}"
+PKEY_AudioEndpoint_Association = "{1DA5D803-D492-4EDD-8C23-E0C0FFEE7F0E},2"
+
+; Localizable
+NexusVAIO               = "Nexus VAIO"
+NexusVAIO.DeviceDesc    = "Nexus VAIO Virtual Audio Device"
+NexusVAIO.RenderName    = "Nexus VAIO Output"
+NexusVAIO.TopologyName  = "Nexus VAIO Topology"
+NexusVAIO.ServiceName   = "Nexus VAIO Audio Driver"
+
+NexusAUX                = "Nexus VAIO"
+NexusAUX.DeviceDesc     = "Nexus AUX Virtual Audio Device"
+NexusAUX.RenderName     = "Nexus AUX Output"
+NexusAUX.TopologyName   = "Nexus AUX Topology"
+
+DiskName                = "Nexus VAIO Audio Driver Installation Disk"

@@ -1,0 +1,77 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Nexus-Mixer",
+  "version": "0.3.0",
+  "identifier": "ru.autsquad.nexusmixer",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:5173",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Nexus-Mixer — Nexus × АутSquad",
+        "width": 2200,
+        "height": 1320,
+        "minWidth": 1440,
+        "minHeight": 900,
+        "center": true,
+        "maximized": true,
+        "resizable": true,
+        "decorations": false,
+        "transparent": false,
+        "theme": "Dark",
+        "backgroundColor": "#080A0F",
+        "dragDropEnabled": false,
+        "visible": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "nsis"
+    ],
+    "resources": [
+      "resources/rename-cables.ps1"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico"
+    ],
+    "publisher": "АутSquad",
+    "copyright": "© 2026 Nexus × АутSquad",
+    "category": "Music",
+    "shortDescription": "Виртуальный аудиомикшер с ИИ-пресетами голоса",
+    "longDescription": "Nexus-Mixer — студийная консоль для Windows: 8 источников, 3 физических выхода и 12 виртуальных кабелей, DSP-цепочки, матрица маршрутизации и локальная ИИ-конвертация голоса.",
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": [
+          "Russian",
+          "English"
+        ]
+      }
+    },
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/roma1231jjj-cpu/Nexus-mixer/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEEyRDE5OTA1QzIxNDZBRTgKUldUb2FoVENCWm5Sb3VvbXJnMXZGNVYwQWVLbVExK3lYVE9iTWx3UThGN2hQV09pZmdCaW00eGwK",
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  }
+}

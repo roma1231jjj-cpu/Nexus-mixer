@@ -1,0 +1,134 @@
+;--------------------------------------------------------------------------
+; nexusvaio.inx - INX file for Inf2Cat processing
+;
+; This is the INX (input XML) file used by Inf2Cat to generate the
+; final INF with proper architecture decorations.
+;
+; Copyright (c) 2024-2025 Nexus VAIO. All rights reserved.
+;--------------------------------------------------------------------------
+
+[Version]
+Signature   = "$WINDOWS NT$"
+Class       = MEDIA
+ClassGuid   = {4d36e96c-e325-11ce-bfc1-08002be10318}
+Provider    = %NexusVAIO%
+DriverVer   = 12/01/2024,1.0.0.0
+CatalogFile = nexusvaio.cat
+PnpLockDown = 1
+
+[SourceDisksNames]
+1 = %DiskName%
+
+[SourceDisksFiles]
+nexusvaio.sys = 1
+
+[DestinationDirs]
+DefaultDestDir  = 12    ; DIRID_DRIVERS
+Miniport.CopyList = 12
+
+;--------------------------------------------------------------------------
+; Manufacturer and Models
+;--------------------------------------------------------------------------
+
+[Manufacturer]
+%NexusVAIO% = NexusVAIO, NT$ARCH$
+
+[NexusVAIO.NT$ARCH$]
+
+; Nexus VAIO Main Device (sub-device 0)
+%NexusVAIO.DeviceDesc%     = NEXUSVAIO_Device, SW\{f8b4c5a0-7b4c-11ef-8a1d-00155d0a0b01}\NEXUSVAIO
+%NexusVAIO.DeviceDesc%     = NEXUSVAIO_Device, SW\{f8b4c5a0-7b4c-11ef-8a1d-00155d0a0b01}\NEXUSVAIO_RENDER
+%NexusVAIO.DeviceDesc%     = NEXUSVAIO_Device, SW\{f8b4c5a0-7b4c-11ef-8a1d-00155d0a0b01}\NEXUSVAIO_CAPTURE
+
+; Nexus AUX Device (sub-device 1)
+%NexusAUX.DeviceDesc%      = NEXUSAUX_Device, SW\{f8b4c5a1-7b4c-11ef-8a1d-00155d0a0b01}\NEXUSAUX
+%NexusAUX.DeviceDesc%      = NEXUSAUX_Device, SW\{f8b4c5a1-7b4c-11ef-8a1d-00155d0a0b01}\NEXUSAUX_RENDER
+%NexusAUX.DeviceDesc%      = NEXUSAUX_Device, SW\{f8b4c5a1-7b4c-11ef-8a1d-00155d0a0b01}\NEXUSAUX_CAPTURE
+
+; USB\VID style IDs for software device creation
+%NexusVAIO.DeviceDesc%     = NEXUSVAIO_Device, USB\VID_FFFF&PID_0001&MI_00
+%NexusAUX.DeviceDesc%      = NEXUSAUX_Device,  USB\VID_FFFF&PID_0001&MI_01
+
+;--------------------------------------------------------------------------
+; Device Installation Sections
+;--------------------------------------------------------------------------
+
+[NEXUSVAIO_Device.NT$ARCH$]
+CopyFiles = Miniport.CopyList
+AddReg    = NEXUSVAIO.AddReg, Shared.AddReg
+
+[NEXUSVAIO_Device.NT$ARCH$.Services]
+AddService = nexusvaio, 0x00000002, NEXUSVAIO_Service_Inst
+
+[NEXUSAUX_Device.NT$ARCH$]
+CopyFiles = Miniport.CopyList
+AddReg    = NEXUSAUX.AddReg, Shared.AddReg
+
+[NEXUSAUX_Device.NT$ARCH$.Services]
+AddService = nexusvaio, 0x00000002, NEXUSVAIO_Service_Inst
+
+;--------------------------------------------------------------------------
+; Copy Files
+;--------------------------------------------------------------------------
+
+[Miniport.CopyList]
+nexusvaio.sys
+
+;--------------------------------------------------------------------------
+; Registry AddReg Sections
+;--------------------------------------------------------------------------
+
+[NEXUSVAIO.AddReg]
+HKR,,"FriendlyName",,%NexusVAIO.FriendlyName%
+HKR,,"PinDeviceName",0x00020000,%NexusVAIO.RenderPinName%
+HKR,,"CaptureDeviceName",0x00020000,%NexusVAIO.CapturePinName%
+HKR,,"EndpointPnpState",0x00010001,0x00000001
+HKR,,"DeviceType",0x00010001,0x00000001
+
+[NEXUSAUX.AddReg]
+HKR,,"FriendlyName",,%NexusAUX.FriendlyName%
+HKR,,"PinDeviceName",0x00020000,%NexusAUX.RenderPinName%
+HKR,,"CaptureDeviceName",0x00020000,%NexusAUX.CapturePinName%
+HKR,,"EndpointPnpState",0x00010001,0x00000001
+HKR,,"DeviceType",0x00010001,0x00000001
+
+[Shared.AddReg]
+HKR,,"LowerFilters",0x00010008,%MEDIA.GUID%
+HKR,,"UpperFilters",0x00010008,%MEDIA.GUID%
+HKR,,"DeviceCharacteristics",0x00010001,0x00000100
+HKR,,"Capabilities",0x00010001,0x00000004
+
+;--------------------------------------------------------------------------
+; Service Installation
+;--------------------------------------------------------------------------
+
+[NEXUSVAIO_Service_Inst]
+DisplayName    = %NexusVAIO.ServiceName%
+ServiceType    = 1            ; SERVICE_KERNEL_DRIVER
+StartType      = 3            ; SERVICE_DEMAND_START
+ErrorControl   = 1            ; SERVICE_ERROR_NORMAL
+ServiceBinary  = %12%\nexusvaio.sys
+LoadOrderGroup = Port Class
+Dependencies   = "KSecPkg"
+
+;--------------------------------------------------------------------------
+; Strings
+;--------------------------------------------------------------------------
+
+[Strings]
+NexusVAIO               = "Nexus VAIO"
+NexusVAIO.DeviceDesc    = "Nexus VAIO Virtual Audio Device"
+NexusVAIO.FriendlyName  = "Nexus VAIO Audio"
+NexusVAIO.RenderPinName = "Nexus VAIO Output"
+NexusVAIO.CapturePinName = "Nexus VAIO Input"
+NexusVAIO.ServiceName   = "Nexus VAIO Audio Driver"
+
+NexusAUX                = "Nexus VAIO"
+NexusAUX.DeviceDesc     = "Nexus AUX Virtual Audio Device"
+NexusAUX.FriendlyName   = "Nexus AUX Audio"
+NexusAUX.RenderPinName  = "Nexus AUX Output"
+NexusAUX.CapturePinName = "Nexus AUX Input"
+NexusAUX.ServiceName    = "Nexus VAIO Audio Driver"
+
+DiskName                = "Nexus VAIO Audio Driver Installation Disk"
+MEDIA.GUID              = "{4d36e96c-e325-11ce-bfc1-08002be10318}"

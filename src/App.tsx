@@ -1,0 +1,258 @@
+import { useEffect, useRef, useState } from 'react'
+import { Check, Plus } from 'lucide-react'
+import { TitleBar } from './components/TitleBar'
+import { Toolbar } from './components/Toolbar'
+import { Strip } from './components/Strip'
+import { Bus } from './components/Bus'
+import { RoutingMatrix } from './components/RoutingMatrix'
+import { RackDock } from './components/rack/RackDock'
+import { MultiSelectBar } from './components/MultiSelectBar'
+import { StatusBar } from './components/StatusBar'
+import { SettingsDrawer } from './components/SettingsDrawer'
+import { ShortcutsSheet } from './components/ShortcutsSheet'
+import { GuideSheet } from './components/GuideSheet'
+import { AddSourceDialog } from './components/AddSourceDialog'
+import { CableSetupDialog } from './components/CableSetupDialog'
+import { TooltipLayer } from './components/TooltipLayer'
+import { UpdateBanner } from './components/UpdateBanner'
+import { STRIP_ORDER, BUS_ORDER } from './data/defaults'
+import { useEngineBridge } from './lib/useEngineBridge'
+import { MidiLearnProvider } from './lib/midiLearnContext'
+import { useMixer } from './store/useMixer'
+import { useUi } from './store/useUi'
+import { useUpdater } from './store/useUpdater'
+
+const A_BUSES = BUS_ORDER.filter((id) => id.startsWith('A'))
+const B_BUSES = BUS_ORDER.filter((id) => id.startsWith('B'))
+
+const isTyping = (target: EventTarget | null): boolean => {
+  if (!(target instanceof HTMLElement)) return false
+  const tag = target.tagName
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable
+}
+
+const matchesShortcut = (event: KeyboardEvent, shortcut: string): boolean => {
+  const parts = shortcut
+    .toLowerCase()
+    .split('+')
+    .map((part) => part.trim())
+    .filter(Boolean)
+  if (parts.length === 0) return false
+  const key = parts[parts.length - 1]
+  const needCtrl = parts.includes('ctrl')
+  const needShift = parts.includes('shift')
+  const needAlt = parts.includes('alt')
+  const sameModifiers = event.ctrlKey === needCtrl && event.shiftKey === needShift && event.altKey === needAlt
+  return sameModifiers && event.key.toLowerCase() === key
+}
+
+export default function App() {
+  useEngineBridge()
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  const [addSourceOpen, setAddSourceOpen] = useState(false)
+  const [cableSetupOpen, setCableSetupOpen] = useState(false)
+  const matrixWasOpen = useRef(false)
+
+  const matrixOpen = useMixer((s) => s.matrixOpen)
+  const sourceCount = useMixer((s) => s.sourceCount)
+  const setSettingsOpen = useMixer((s) => s.setSettingsOpen)
+  const settingsOpen = useMixer((s) => s.settingsOpen)
+  const setMatrixOpen = useMixer((s) => s.setMatrixOpen)
+
+  useEffect(() => {
+    if (matrixWasOpen.current && !matrixOpen) {
+      document.querySelector('.board')?.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+    matrixWasOpen.current = matrixOpen
+  }, [matrixOpen])
+  const setRackTab = useMixer((s) => s.setRackTab)
+  const selectStrip = useMixer((s) => s.selectStrip)
+  const selectBus = useMixer((s) => s.selectBus)
+  const macros = useMixer((s) => s.macros)
+  const runMacro = useMixer((s) => s.runMacro)
+  const rackOpen = useUi((s) => s.rackOpen)
+  const toast = useUi((s) => s.toast)
+  const visibleStrips = STRIP_ORDER.slice(0, sourceCount)
+
+  // The rack is docked on wide screens and becomes a drawer below 1460 px.
+  // Start with it closed on smaller displays so the console is fully visible.
+  useEffect(() => {
+    if (window.innerWidth < 1460) useUi.getState().setRackOpen(false)
+  }, [])
+
+  // Automatic update check shortly after the audio UI settles. Failures stay
+  // silent here; the settings section exposes a manual retry with details.
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void useUpdater.getState().check(true)
+    }, 5000)
+    return () => window.clearTimeout(timer)
+  }, [])
+
+  // Only one modal surface at a time. Before this, the settings drawer could
+  // open behind the rack scrim and the matrix could cover the rack silently.
+  useEffect(() => {
+    if (matrixOpen) {
+      useUi.getState().setRackOpen(false)
+      setSettingsOpen(false)
+    }
+  }, [matrixOpen, setSettingsOpen])
+
+  useEffect(() => {
+    if (settingsOpen) {
+      useUi.getState().setRackOpen(false)
+      setMatrixOpen(false)
+    }
+  }, [settingsOpen, setMatrixOpen])
+
+  // Deep links: ?strip=hw2&tab=ai or ?bus=B1&drawer=settings
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const tab = params.get('tab')
+    if (tab === 'fx' || tab === 'ai' || tab === 'macros' || tab === 'record' || tab === 'sound' || tab === 'groups') {
+      setRackTab(tab)
+      useUi.getState().setRackOpen(true)
+    }
+    const strip = params.get('strip')
+    if (strip && (STRIP_ORDER as string[]).includes(strip)) selectStrip(strip as (typeof STRIP_ORDER)[number])
+    const bus = params.get('bus')
+    if (bus && (BUS_ORDER as string[]).includes(bus)) selectBus(bus as (typeof BUS_ORDER)[number])
+    if (params.get('drawer') === 'settings') setSettingsOpen(true)
+  }, [setRackTab, selectStrip, selectBus, setSettingsOpen])
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setSettingsOpen(false)
+        setShortcutsOpen(false)
+        setMatrixOpen(false)
+        useUi.getState().setGuideOpen(false)
+        useUi.getState().setRackOpen(false)
+        return
+      }
+      if (event.key === 'F1') {
+        event.preventDefault()
+        useUi.getState().setGuideOpen(true)
+        return
+      }
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault()
+        setShortcutsOpen((prev) => !prev)
+        return
+      }
+      if (isTyping(event.target)) return
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
+        event.preventDefault()
+        const state = useMixer.getState()
+        const strip = state.strips[state.selectedStripId]
+        state.savePreset(`${strip.name} · ${new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`)
+        useUi.getState().notify('Пресет сохранён в «Мои пресеты»')
+        return
+      }
+      if (event.key.toLowerCase() === 'c') {
+        const state = useMixer.getState()
+        state.setMatrixOpen(!state.matrixOpen)
+        return
+      }
+      if (event.key.toLowerCase() === 'r') {
+        useUi.getState().openRack('ai')
+        return
+      }
+      for (const macro of macros) {
+        if (macro.shortcut && matchesShortcut(event, macro.shortcut)) {
+          event.preventDefault()
+          runMacro(macro.id)
+          return
+        }
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [macros, runMacro, setSettingsOpen, setMatrixOpen])
+
+  return (
+    <MidiLearnProvider>
+      <div className="app-shell">
+        <TitleBar />
+        <Toolbar />
+
+        <div className="workspace">
+          {rackOpen ? <button type="button" className="rack-scrim" aria-label="Закрыть панель" onClick={() => useUi.getState().toggleRack()} /> : null}
+          <main className="board">
+            <MultiSelectBar />
+
+            <section className="section-strips" aria-label="Источники">
+              <div className="section-bar">
+                <span className="section-label">Источники</span>
+                <span className="section-count">{sourceCount} / {STRIP_ORDER.length}</span>
+                <span className="section-hint">нажмите на название, чтобы переименовать</span>
+                <button
+                  type="button"
+                  className="add-source-btn"
+                  onClick={() => setAddSourceOpen(true)}
+                  disabled={sourceCount >= STRIP_ORDER.length}
+                >
+                  <Plus size={14} /> Добавить
+                </button>
+              </div>
+              <div className="strips" style={{ '--strip-count': visibleStrips.length } as React.CSSProperties}>
+                {visibleStrips.map((id) => (
+                  <Strip key={id} id={id} />
+                ))}
+              </div>
+            </section>
+
+            <section className="section-buses" aria-label="Выходы">
+              <div className="section-bar">
+                <span className="section-label">Выходы</span>
+                <span className="section-count">{A_BUSES.length}</span>
+                <span className="section-hint">физические</span>
+              </div>
+              <div className="outputs-main">
+                {A_BUSES.map((id) => (
+                  <Bus key={id} id={id} variant="main" />
+                ))}
+              </div>
+
+              <div className="cable-bay-head">
+                <span className="section-label">Виртуальные кабели</span>
+                <span className="section-count">{B_BUSES.length}</span>
+                <span className="section-hint">каждый кабель — отдельный виртуальный микрофон</span>
+                <button type="button" className="add-source-btn" onClick={() => setCableSetupOpen(true)}>
+                  Настроить кабели
+                </button>
+              </div>
+              <div className="outputs-cables">
+                {B_BUSES.map((id) => (
+                  <Bus key={id} id={id} variant="cable" />
+                ))}
+              </div>
+            </section>
+
+          </main>
+
+          {matrixOpen ? <RoutingMatrix /> : null}
+
+          {rackOpen ? <RackDock onClose={() => useUi.getState().toggleRack()} /> : null}
+        </div>
+
+        <StatusBar />
+      </div>
+
+      <SettingsDrawer />
+      <AddSourceDialog open={addSourceOpen} onClose={() => setAddSourceOpen(false)} />
+      <CableSetupDialog open={cableSetupOpen} onClose={() => setCableSetupOpen(false)} />
+      <ShortcutsSheet open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+      <GuideSheet />
+      <TooltipLayer />
+      <UpdateBanner />
+
+      {toast ? (
+        <div className="toast glass-strong" role="status">
+          <Check size={14} className="good" />
+          {toast.text}
+        </div>
+      ) : null}
+    </MidiLearnProvider>
+  )
+}

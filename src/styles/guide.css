@@ -1,0 +1,403 @@
+/* Tooltips, in-app guide and the floating processing rack. */
+
+.app-tooltip {
+  position: fixed;
+  z-index: 500;
+  max-width: 300px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--stroke-strong);
+  background: var(--panel-solid);
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.45;
+  text-align: center;
+  white-space: normal;
+  pointer-events: none;
+  transform: translate(-50%, -100%);
+  box-shadow: 0 14px 34px -12px rgba(0, 0, 0, 0.75), var(--rim);
+  animation: tipIn 0.12s var(--ease) both;
+}
+
+.app-tooltip.bottom {
+  transform: translate(-50%, 0);
+}
+
+@keyframes tipIn {
+  from {
+    opacity: 0;
+    margin-top: 2px;
+  }
+}
+
+/* ------------------------------ guide sheet ------------------------------ */
+
+.guide-sheet {
+  position: fixed;
+  z-index: 80;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  width: min(820px, calc(100vw - 28px));
+  max-height: min(88vh, 920px);
+  border: 1px solid var(--stroke-strong);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 50px 120px -30px rgba(0, 0, 0, 0.9), var(--rim);
+  animation: guideIn 0.18s var(--ease) both;
+}
+
+@keyframes guideIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% + 10px)) scale(0.985);
+  }
+}
+
+.guide-body {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 18px 22px 24px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.guide-hero {
+  padding: 18px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--stroke));
+  background:
+    radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 60%),
+    var(--panel-inset);
+}
+
+.guide-kicker {
+  font-size: 8px;
+  font-weight: 750;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent-bright);
+}
+
+.guide-hero h3 {
+  margin: 6px 0 8px;
+  font-size: 17px;
+  font-weight: 680;
+  letter-spacing: -0.015em;
+  color: var(--text);
+}
+
+.guide-hero p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-dim);
+}
+
+.guide-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.guide-pills span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--stroke);
+  background: var(--panel);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+.guide-hero-link {
+  margin-top: 12px;
+  padding: 6px 11px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--accent) 38%, var(--stroke));
+  background: var(--accent-soft);
+  color: var(--accent-bright);
+  font-size: 11px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background 0.14s, border-color 0.14s;
+}
+
+.guide-hero-link:hover {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  border-color: var(--accent);
+}
+
+.guide-toc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.guide-toc button {
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--stroke);
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.14s, border-color 0.14s, background 0.14s;
+}
+
+.guide-toc button:hover {
+  color: var(--accent-bright);
+  border-color: var(--stroke-strong);
+  background: var(--accent-soft);
+}
+
+.guide-section {
+  scroll-margin-top: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--stroke-soft);
+}
+
+.guide-section h3 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 680;
+  color: var(--text);
+}
+
+.guide-section h3 svg {
+  color: var(--accent-bright);
+}
+
+.guide-section p {
+  margin: 0 0 9px;
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--text-dim);
+}
+
+.guide-section ul,
+.guide-section ol {
+  margin: 0 0 10px;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.guide-section li {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-dim);
+}
+
+.guide-section b {
+  color: var(--text);
+  font-weight: 650;
+}
+
+.guide-section code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--panel-inset);
+  border: 1px solid var(--stroke-soft);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--accent-bright);
+}
+
+.guide-flow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 12px;
+}
+
+.guide-flow span {
+  padding: 5px 9px;
+  border-radius: 7px;
+  border: 1px solid var(--stroke);
+  background: var(--panel);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+.guide-flow i {
+  font-style: normal;
+  color: var(--accent-bright);
+}
+
+.guide-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(205px, 1fr));
+  gap: 9px;
+  margin: 10px 0;
+}
+
+.guide-grid > div {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--stroke);
+  background: var(--panel);
+}
+
+.guide-grid > div > b {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 11px;
+}
+
+.guide-grid p {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.guide-note {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--stroke));
+  border-left: 3px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--text-dim);
+}
+
+.guide-note.warn {
+  border-color: color-mix(in srgb, var(--warn) 34%, var(--stroke));
+  border-left-color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 8%, transparent);
+}
+
+.guide-arch-note {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--bad) 30%, var(--stroke));
+  border-left: 3px solid var(--bad);
+  background: color-mix(in srgb, var(--bad) 7%, transparent);
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--text-dim);
+}
+
+.guide-key {
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--stroke));
+  background: color-mix(in srgb, var(--accent) 4%, transparent);
+}
+
+.guide-keys {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.guide-keys span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 7px;
+  border: 1px solid var(--stroke-soft);
+  background: var(--panel-inset);
+  font-size: 10.5px;
+  color: var(--text-dim);
+}
+
+.guide-footer {
+  padding-top: 14px;
+  border-top: 1px solid var(--stroke-soft);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
+  text-align: center;
+}
+
+/* --------------------------- floating rack window ------------------------ */
+
+.rack-dock {
+  position: absolute;
+  z-index: 60;
+  inset: 10px 10px 10px auto;
+  width: min(440px, calc(100vw - 20px));
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border: 1px solid var(--stroke-strong);
+  border-radius: 18px;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--accent) 5%, transparent), transparent 30%),
+    color-mix(in srgb, var(--bg-2) 94%, transparent);
+  backdrop-filter: var(--backdrop);
+  -webkit-backdrop-filter: var(--backdrop);
+  box-shadow: 0 40px 100px -34px rgba(0, 0, 0, 0.85), var(--rim);
+  animation: rackSlide 0.18s var(--ease) both;
+}
+
+.rack-close {
+  margin-left: 6px;
+  flex: 0 0 auto;
+}
+
+.rack-scrim {
+  display: block;
+  position: absolute;
+  inset: 0;
+  z-index: 55;
+  padding: 0;
+  border: none;
+  background: radial-gradient(120% 100% at 80% 20%, rgba(6, 4, 14, 0.08), rgba(4, 2, 12, 0.22));
+  backdrop-filter: blur(1.5px) saturate(105%);
+  -webkit-backdrop-filter: blur(1.5px) saturate(105%);
+  animation: fadeIn 0.15s var(--ease) both;
+  cursor: default;
+}
+
+:root[data-theme='light'] .rack-scrim {
+  background: radial-gradient(120% 100% at 80% 20%, rgba(226, 234, 252, 0.1), rgba(208, 220, 244, 0.22));
+}
+
+.rack-content {
+  flex: 1;
+  min-height: 0;
+}
+
+@media (max-width: 1500px) {
+  .tool-btn .btn-label {
+    display: none;
+  }
+
+  .tool-btn {
+    padding: 0 10px;
+  }
+}
+
+@media (max-width: 760px) {
+  .guide-grid,
+  .guide-keys {
+    grid-template-columns: 1fr;
+  }
+
+  .guide-body {
+    padding: 14px 14px 18px;
+  }
+}
