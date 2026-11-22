@@ -14,7 +14,7 @@ import './styles/studio.css'
 import './styles/console-v2.css'
 import './styles/glass.css'
 
-// Re-apply the persisted theme before the first paint. `?theme=light|dark`
+// Re-apply the persisted theme before the first paint. `?theme=studio|light|dark`
 // keeps theme previews and screenshots deterministic.
 const requestedTheme = new URLSearchParams(window.location.search).get('theme')
 if (requestedTheme === 'studio' || requestedTheme === 'light' || requestedTheme === 'dark') {

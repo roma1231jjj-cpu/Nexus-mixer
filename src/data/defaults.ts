@@ -672,7 +672,7 @@ export const makeInitialState = (): Omit<MixerState, 'theme'> & { theme: Theme }
   masterEq: makeMasterEq(),
   masterEqEnabled: false,
   masterGainDb: 0,
-  theme: 'studio',
+  theme: 'dark',
   sourceCount: 5,
   selectedStripId: 'hw1',
   selectedBusId: 'A1',
