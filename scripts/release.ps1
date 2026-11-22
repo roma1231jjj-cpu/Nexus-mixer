@@ -60,7 +60,8 @@ $latest = [ordered]@{
   }
 }
 $latestPath = Join-Path $nsisDir "latest.json"
-$latest | ConvertTo-Json -Depth 5 | Set-Content -Path $latestPath -Encoding UTF8
+$json = $latest | ConvertTo-Json -Depth 5
+[IO.File]::WriteAllText($latestPath, $json, (New-Object System.Text.UTF8Encoding($false)))
 
 $portable = Join-Path $nsisDir "Nexus-Mixer-${version}-portable.zip"
 $exe = Join-Path $root "src-tauri/target/release/nexus-mixer.exe"
