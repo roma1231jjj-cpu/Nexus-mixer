@@ -1666,6 +1666,15 @@
   font-size: 9px;
   color: var(--text-dim);
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cable-bus-row .pill {
+  flex-shrink: 0;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
 /* --------------------------------- end cable ------------------------------- */

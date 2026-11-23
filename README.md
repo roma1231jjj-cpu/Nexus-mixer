@@ -14,6 +14,18 @@
 
 > **Nexus × АутSquad** · v0.4.0 · Windows 10/11 x64 · интерфейс на русском и английском
 
+Три темы в английском интерфейсе:
+
+| Nexus-Studio | Nexus-Dark | Nexus-Frost |
+| --- | --- | --- |
+| ![](docs/screenshots/en-theme-studio.png) | ![](docs/screenshots/en-theme-dark.png) | ![](docs/screenshots/en-theme-light.png) |
+
+| Настройки | Инструкция |
+| --- | --- |
+| ![](docs/screenshots/en-settings.png) | ![](docs/screenshots/en-guide.png) |
+
+Русский интерфейс:
+
 | Консоль | Настройки | Инструкция |
 | --- | --- | --- |
 | ![](docs/screenshots/ru-rack.png) | ![](docs/screenshots/ru-settings.png) | ![](docs/screenshots/ru-guide.png) |

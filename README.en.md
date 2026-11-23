@@ -14,9 +14,21 @@ real-time voice effects.
 
 > **Nexus × AutSquad** · v0.4.0 · Windows 10/11 x64 · Russian and English UI
 
+Three themes in the English interface:
+
+| Nexus-Studio | Nexus-Dark | Nexus-Frost |
+| --- | --- | --- |
+| ![](docs/screenshots/en-theme-studio.png) | ![](docs/screenshots/en-theme-dark.png) | ![](docs/screenshots/en-theme-light.png) |
+
+| Settings | Guide |
+| --- | --- |
+| ![](docs/screenshots/en-settings.png) | ![](docs/screenshots/en-guide.png) |
+
+Russian interface:
+
 | Console | Settings | Guide |
 | --- | --- | --- |
-| ![](docs/screenshots/en-rack.png) | ![](docs/screenshots/en-settings.png) | ![](docs/screenshots/en-guide.png) |
+| ![](docs/screenshots/ru-rack.png) | ![](docs/screenshots/ru-settings.png) | ![](docs/screenshots/ru-guide.png) |
 
 An instrument panel, not a website: channels, meters, routing and buses are visible
 at once, with no tabs and no extra clicks.
