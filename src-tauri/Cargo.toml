@@ -1,6 +1,6 @@
 [package]
 name = "nexus-mixer"
-version = "0.4.0"
+version = "0.4.1"
 description = "Nexus-Mixer — virtual audio mixer with AI voice presets. Nexus × АутSquad"
 authors = ["Nexus × АутSquad"]
 edition = "2021"
