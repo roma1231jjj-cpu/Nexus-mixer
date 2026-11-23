@@ -1516,9 +1516,9 @@
   flex: 0 0 auto;
   border-top: 1px solid var(--stroke-soft);
   background: linear-gradient(0deg, var(--panel), transparent);
-  color: var(--faint);
+  color: var(--muted);
   font-family: var(--font-mono);
-  font-size: 8.5px;
+  font-size: 9.5px;
   letter-spacing: 0.02em;
   overflow: hidden;
 }
