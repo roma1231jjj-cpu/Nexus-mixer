@@ -39,14 +39,14 @@ export function StatusBar() {
         <i className={`status-led${status.running ? ' on' : ''}${busy ? ' pending' : ''}`} />
         <b>
           {!engineBridge.available
-            ? 'DEMO'
+            ? t('status.demo')
             : busy
               ? status.running
-                ? 'STOPPING…'
-                : 'STARTING…'
+                ? t('status.stopping')
+                : t('status.starting')
               : status.running
-                ? 'RUNNING'
-                : 'STOPPED'}
+                ? t('status.running')
+                : t('status.stopped')}
         </b>
       </span>
 
@@ -59,7 +59,7 @@ export function StatusBar() {
           data-tip={status.running ? t('status.stopTip') : t('status.startTip')}
         >
           <Power size={10} />
-          {busy ? '…' : status.running ? 'STOP' : 'START'}
+          {busy ? '…' : status.running ? t('status.stop') : t('status.start')}
         </button>
       ) : null}
 
@@ -79,7 +79,7 @@ export function StatusBar() {
       </span>
 
       <span className="status-item" data-tip={t('status.voiceTip')}>
-        Voice {ai.enabled ? ai.mode.toUpperCase() : 'off'}
+        {t('status.voice')} {ai.enabled ? ai.mode.toUpperCase() : t('common.off')}
       </span>
 
       <span className="status-spacer" />
