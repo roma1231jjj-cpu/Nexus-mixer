@@ -179,7 +179,7 @@ export default function App() {
   }, [macros, runMacro, setSettingsOpen, setMatrixOpen, lang])
 
   return (
-    <MidiLearnProvider>
+    <MidiLearnProvider key={lang}>
       <div className="app-shell">
         <TitleBar />
         <Toolbar />
