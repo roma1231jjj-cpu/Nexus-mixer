@@ -21,6 +21,8 @@ import { MidiLearnProvider } from './lib/midiLearnContext'
 import { useMixer } from './store/useMixer'
 import { useUi } from './store/useUi'
 import { useUpdater } from './store/useUpdater'
+import { translate, useT, useLang, LOCALES } from './i18n'
+import { syncLocalizedDefaults } from './i18n/syncNames'
 
 const A_BUSES = BUS_ORDER.filter((id) => id.startsWith('A'))
 const B_BUSES = BUS_ORDER.filter((id) => id.startsWith('B'))
@@ -48,6 +50,8 @@ const matchesShortcut = (event: KeyboardEvent, shortcut: string): boolean => {
 
 export default function App() {
   useEngineBridge()
+  const t = useT()
+  const lang = useLang((s) => s.lang)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [addSourceOpen, setAddSourceOpen] = useState(false)
   const [cableSetupOpen, setCableSetupOpen] = useState(false)
@@ -76,6 +80,10 @@ export default function App() {
 
   // The rack is docked on wide screens and becomes a drawer below 1460 px.
   // Start with it closed on smaller displays so the console is fully visible.
+  useEffect(() => {
+    syncLocalizedDefaults(lang)
+  }, [lang])
+
   useEffect(() => {
     if (window.innerWidth < 1460) useUi.getState().setRackOpen(false)
   }, [])
@@ -145,8 +153,8 @@ export default function App() {
         event.preventDefault()
         const state = useMixer.getState()
         const strip = state.strips[state.selectedStripId]
-        state.savePreset(`${strip.name} · ${new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`)
-        useUi.getState().notify('Пресет сохранён в «Мои пресеты»')
+        state.savePreset(`${strip.name} · ${new Date().toLocaleTimeString(LOCALES[lang], { hour: '2-digit', minute: '2-digit' })}`)
+        useUi.getState().notify(translate(lang, 'app.presetSaved'))
         return
       }
       if (event.key.toLowerCase() === 'c') {
@@ -168,7 +176,7 @@ export default function App() {
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [macros, runMacro, setSettingsOpen, setMatrixOpen])
+  }, [macros, runMacro, setSettingsOpen, setMatrixOpen, lang])
 
   return (
     <MidiLearnProvider>
@@ -177,22 +185,22 @@ export default function App() {
         <Toolbar />
 
         <div className="workspace">
-          {rackOpen ? <button type="button" className="rack-scrim" aria-label="Закрыть панель" onClick={() => useUi.getState().toggleRack()} /> : null}
+          {rackOpen ? <button type="button" className="rack-scrim" aria-label={t('app.closePanel')} onClick={() => useUi.getState().toggleRack()} /> : null}
           <main className="board">
             <MultiSelectBar />
 
-            <section className="section-strips" aria-label="Источники">
+            <section className="section-strips" aria-label={t('app.sourcesAria')}>
               <div className="section-bar">
-                <span className="section-label">Источники</span>
+                <span className="section-label">{t('app.sources')}</span>
                 <span className="section-count">{sourceCount} / {STRIP_ORDER.length}</span>
-                <span className="section-hint">нажмите на название, чтобы переименовать</span>
+                <span className="section-hint">{t('app.sourcesHint')}</span>
                 <button
                   type="button"
                   className="add-source-btn"
                   onClick={() => setAddSourceOpen(true)}
                   disabled={sourceCount >= STRIP_ORDER.length}
                 >
-                  <Plus size={14} /> Добавить
+                  <Plus size={14} /> {t('app.add')}
                 </button>
               </div>
               <div className="strips" style={{ '--strip-count': visibleStrips.length } as React.CSSProperties}>
@@ -202,11 +210,11 @@ export default function App() {
               </div>
             </section>
 
-            <section className="section-buses" aria-label="Выходы">
+            <section className="section-buses" aria-label={t('app.outputsAria')}>
               <div className="section-bar">
-                <span className="section-label">Выходы</span>
+                <span className="section-label">{t('app.outputs')}</span>
                 <span className="section-count">{A_BUSES.length}</span>
-                <span className="section-hint">физические</span>
+                <span className="section-hint">{t('app.physical')}</span>
               </div>
               <div className="outputs-main">
                 {A_BUSES.map((id) => (
@@ -215,11 +223,11 @@ export default function App() {
               </div>
 
               <div className="cable-bay-head">
-                <span className="section-label">Виртуальные кабели</span>
+                <span className="section-label">{t('app.cables')}</span>
                 <span className="section-count">{B_BUSES.length}</span>
-                <span className="section-hint">каждый кабель — отдельный виртуальный микрофон</span>
+                <span className="section-hint">{t('app.cablesHint')}</span>
                 <button type="button" className="add-source-btn" onClick={() => setCableSetupOpen(true)}>
-                  Настроить кабели
+                  {t('app.setupCables')}
                 </button>
               </div>
               <div className="outputs-cables">

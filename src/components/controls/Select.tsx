@@ -1,5 +1,7 @@
-import { useState, useRef, useEffect } from 'react'
+import {
+  useState, useRef, useEffect } from 'react'
 import { ChevronDown } from 'lucide-react'
+import { t } from '../../i18n'
 
 interface SelectOption {
   value: string
@@ -41,7 +43,7 @@ export function Select({ options, value, onChange, className = '', style, small,
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
       >
-        <span className="custom-select-value">{selected ? selected.label : (placeholder ?? 'Выберите…')}</span>
+        <span className="custom-select-value">{selected ? selected.label : (placeholder ?? t('common.choose'))}</span>
         <ChevronDown size={small ? 10 : 12} className="custom-select-chevron" />
       </button>
 

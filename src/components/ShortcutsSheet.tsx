@@ -1,16 +1,17 @@
 import { Keyboard, X } from 'lucide-react'
+import { useT, type TKey } from '../i18n'
 
-const SHORTCUTS = [
-  { keys: 'F1', desc: 'Открыть инструкцию' },
-  { keys: 'Esc', desc: 'Закрыть настройки / панели' },
-  { keys: 'Ctrl+K', desc: 'Показать этот список' },
-  { keys: 'Ctrl+S', desc: 'Сохранить пресет выбранного канала' },
-  { keys: 'Ctrl+Z', desc: 'Отменить последнее изменение FX' },
-  { keys: 'Ctrl+Shift+Z', desc: 'Повторить отменённое изменение FX' },
-  { keys: '↑ / ↓', desc: 'Изменить значение крутилки (с фокусом)' },
-  { keys: 'Double-click', desc: 'Сбросить крутилку/фейдер по умолчанию' },
-  { keys: 'C', desc: 'Показать/скрыть матрицу маршрутизации' },
-  { keys: 'R', desc: 'Открыть панель Voice' },
+const SHORTCUTS: { keys: string; desc: TKey }[] = [
+  { keys: 'F1', desc: 'shortcuts.f1' },
+  { keys: 'Esc', desc: 'shortcuts.esc' },
+  { keys: 'Ctrl+K', desc: 'shortcuts.ctrlK' },
+  { keys: 'Ctrl+S', desc: 'shortcuts.ctrlS' },
+  { keys: 'Ctrl+Z', desc: 'shortcuts.ctrlZ' },
+  { keys: 'Ctrl+Shift+Z', desc: 'shortcuts.ctrlShiftZ' },
+  { keys: '↑ / ↓', desc: 'shortcuts.arrows' },
+  { keys: 'Double-click', desc: 'shortcuts.dbl' },
+  { keys: 'C', desc: 'shortcuts.c' },
+  { keys: 'R', desc: 'shortcuts.r' },
 ]
 
 interface ShortcutsSheetProps {
@@ -19,6 +20,7 @@ interface ShortcutsSheetProps {
 }
 
 export function ShortcutsSheet({ open, onClose }: ShortcutsSheetProps) {
+  const t = useT()
   if (!open) return null
 
   return (
@@ -33,7 +35,7 @@ export function ShortcutsSheet({ open, onClose }: ShortcutsSheetProps) {
       >
         <header className="drawer-head">
           <Keyboard size={15} className="accent" />
-          <h2>Горячие клавиши</h2>
+          <h2>{t('shortcuts.title')}</h2>
           <button type="button" className="icon-btn" style={{ marginLeft: 'auto' }} onClick={onClose}>
             <X size={15} />
           </button>
@@ -53,7 +55,7 @@ export function ShortcutsSheet({ open, onClose }: ShortcutsSheetProps) {
                   border: '1px solid var(--stroke-soft)',
                 }}
               >
-                <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{sc.desc}</span>
+                <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{t(sc.desc)}</span>
                 <kbd>{sc.keys}</kbd>
               </div>
             ))}

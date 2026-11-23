@@ -5,17 +5,19 @@ import { useMixer } from '../../store/useMixer'
 import { useUi } from '../../store/useUi'
 import { BUS_ORDER, STRIP_ORDER } from '../../data/defaults'
 import { Select } from '../controls/Select'
+import { useT, type TKey } from '../../i18n'
 
-const ACTION_TYPES: { value: MacroAction['type']; label: string }[] = [
-  { value: 'panic', label: 'Panic mute all' },
-  { value: 'mute', label: 'Mute канал' },
-  { value: 'route', label: 'Маршрут на шину' },
-  { value: 'preset', label: 'Пресет' },
-  { value: 'ai', label: 'AI вкл/выкл' },
-  { value: 'gain', label: 'Гейн канала' },
+const ACTION_TYPES: { value: MacroAction['type']; label: TKey }[] = [
+  { value: 'panic', label: 'macro.type.panic' },
+  { value: 'mute', label: 'macro.type.mute' },
+  { value: 'route', label: 'macro.type.route' },
+  { value: 'preset', label: 'macro.type.preset' },
+  { value: 'ai', label: 'macro.type.ai' },
+  { value: 'gain', label: 'macro.type.gain' },
 ]
 
 export function MacroPanel() {
+  const t = useT()
   const macros = useMixer((s) => s.macros)
   const presets = useMixer((s) => s.presets)
   const strips = useMixer((s) => s.strips)
@@ -30,8 +32,7 @@ export function MacroPanel() {
     <>
       <span className="section-label">Macro buttons · {macros.length}</span>
       <p className="tiny faint" style={{ margin: 0, lineHeight: 1.5 }}>
-        Нажмите макрос, чтобы выполнить действие. Горячие клавиши работают, пока окно
-        Nexus-Mixer активно; кнопки с режимом Momentary срабатывают на удержание.
+        {t('macro.hint')}
       </p>
 
       <div className="macro-grid">
@@ -45,7 +46,7 @@ export function MacroPanel() {
               if (!macro.momentary) return
               setPressed(macro.id)
               runMacro(macro.id)
-              notify(`«${macro.label}» · удержание`)
+              notify(t('macro.holdToast', { label: macro.label }))
             }}
             onPointerUp={() => {
               if (!macro.momentary || pressed !== macro.id) return
@@ -60,22 +61,22 @@ export function MacroPanel() {
             onClick={() => {
               if (macro.momentary) return
               runMacro(macro.id)
-              notify(`Макрос «${macro.label}» выполнен`)
+              notify(t('macro.done', { label: macro.label }))
             }}
             title={macro.momentary ? `${macro.action.type} · momentary` : macro.action.type}
           >
             <span className="m-type">{macro.action.type}</span>
             <span className="m-label">{macro.label}</span>
-            <span className="m-key">{macro.shortcut || 'без клавиши'}</span>
+            <span className="m-key">{macro.shortcut || t('macro.noKey')}</span>
           </button>
         ))}
         <button type="button" className="macro-card add" onClick={addMacro}>
           <Plus size={15} />
-          <span className="m-key">Добавить</span>
+          <span className="m-key">{t('macro.add')}</span>
         </button>
       </div>
 
-      <span className="section-label">Настройка макросов</span>
+      <span className="section-label">{t('macro.editTitle')}</span>
       <div className="macro-editors">
         {macros.map((macro) => (
           <div className="macro-editor" key={macro.id}>
@@ -84,17 +85,17 @@ export function MacroPanel() {
               <input
                 className="text-input grow"
                 value={macro.label}
-                aria-label="Название макроса"
+                aria-label={t('macro.labelAria')}
                 onChange={(event) => updateMacro(macro.id, { label: event.target.value })}
               />
-              <button type="button" className="icon-btn" aria-label="Удалить макрос" onClick={() => removeMacro(macro.id)}>
+              <button type="button" className="icon-btn" aria-label={t('macro.remove')} onClick={() => removeMacro(macro.id)}>
                 <Trash2 size={13} />
               </button>
             </div>
             <div className="macro-editor-grid">
               <Select
                 value={macro.action.type}
-                options={ACTION_TYPES}
+                options={ACTION_TYPES.map((item) => ({ value: item.value, label: t(item.label) }))}
                 onChange={(val) => updateMacro(macro.id, { action: { ...macro.action, type: val as MacroAction['type'] } })}
                 small
               />
@@ -103,7 +104,7 @@ export function MacroPanel() {
                 <Select
                   value={macro.action.target ?? ''}
                   options={[
-                    { value: '', label: '— канал —' },
+                    { value: '', label: t('macro.channelOption') },
                     ...STRIP_ORDER.map((id) => ({ value: id, label: strips[id].name })),
                   ]}
                   onChange={(val) => updateMacro(macro.id, { action: { ...macro.action, target: val as typeof macro.action.target } })}
@@ -116,7 +117,7 @@ export function MacroPanel() {
                   <Select
                     value={macro.action.target ?? ''}
                     options={[
-                      { value: '', label: '— канал —' },
+                      { value: '', label: t('macro.channelOption') },
                       ...STRIP_ORDER.map((id) => ({ value: id, label: strips[id].name })),
                     ]}
                     onChange={(val) => updateMacro(macro.id, {
@@ -139,7 +140,7 @@ export function MacroPanel() {
                 <Select
                   value={typeof macro.action.value === 'string' ? macro.action.value : ''}
                   options={[
-                    { value: '', label: '— пресет —' },
+                    { value: '', label: t('macro.presetOption') },
                     ...presets.map((preset) => ({ value: preset.id, label: preset.name })),
                   ]}
                   onChange={(val) => updateMacro(macro.id, { action: { ...macro.action, value: val } })}
@@ -155,7 +156,7 @@ export function MacroPanel() {
                   max={12}
                   step={0.5}
                   value={typeof macro.action.value === 'number' ? macro.action.value : 0}
-                  aria-label="Гейн"
+                  aria-label={t('macro.gainAria')}
                   onChange={(event) =>
                     updateMacro(macro.id, { action: { ...macro.action, value: Number(event.target.value) } })
                   }
@@ -166,7 +167,7 @@ export function MacroPanel() {
                 className="text-input"
                 value={macro.shortcut}
                 placeholder="Ctrl+Shift+1"
-                aria-label="Горячая клавиша"
+                aria-label={t('macro.shortcutAria')}
                 onChange={(event) => updateMacro(macro.id, { shortcut: event.target.value })}
               />
               <label className="checkline" style={{ gridColumn: '1 / -1', fontSize: 10, marginTop: 2 }}>
@@ -176,7 +177,7 @@ export function MacroPanel() {
                   onChange={(event) => updateMacro(macro.id, { momentary: event.target.checked })}
                   style={{ accentColor: 'var(--accent)' }}
                 />
-                Momentary (удержание — активно, отпускание — отключает)
+                {t('macro.momentary')}
               </label>
             </div>
           </div>

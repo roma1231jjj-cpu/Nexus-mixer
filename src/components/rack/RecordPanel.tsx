@@ -6,8 +6,10 @@ import { BUS_ORDER } from '../../data/defaults'
 import { formatTime } from '../../lib/format'
 import type { BusId } from '../../types'
 import { Select } from '../controls/Select'
+import { useT } from '../../i18n'
 
 export function RecordPanel() {
+  const t = useT()
   const recorder = useMixer((s) => s.recorder)
   const recorderStatus = useMixer((s) => s.recorderStatus)
   const setRecorder = useMixer((s) => s.setRecorder)
@@ -53,20 +55,20 @@ export function RecordPanel() {
           <button
             type="button"
             className={`rec-big${recorder.enabled ? ' recording' : ''}`}
-            aria-label={recorder.enabled ? 'Остановить запись' : 'Начать запись'}
-            data-tip={recorder.enabled ? 'Остановить запись' : 'Начать запись выбранных шин'}
+            aria-label={recorder.enabled ? t('rec.stopAria') : t('rec.startAria')}
+            data-tip={recorder.enabled ? t('rec.stopAria') : t('rec.startTip')}
             onClick={() => {
               setRecorder({ enabled: !recorder.enabled })
               if (!recorder.enabled && !engineRunning) {
-                notify('Запись включена. Она начнётся после запуска аудиодвижка')
+                notify(t('rec.pending'))
               } else {
-                notify(recorder.enabled ? 'Запись остановлена' : `Запись шин ${recorder.buses.join(', ')} начата`)
+                notify(recorder.enabled ? t('rec.stopped') : t('rec.started', { buses: recorder.buses.join(', ') }))
               }
             }}
           />
           <div className="rec-info">
             <div className="rec-title">
-              {liveRecording ? 'ИДЁТ ЗАПИСЬ' : recorder.enabled ? 'ОЖИДАНИЕ ДВИЖКА' : 'ГОТОВ К ЗАПИСИ'}
+              {liveRecording ? t('rec.stateLive') : recorder.enabled ? t('rec.stateWaiting') : t('rec.stateReady')}
             </div>
             <div className="rec-time">{formatTime(displaySeconds)}</div>
             <div className="rec-meta">
@@ -84,7 +86,7 @@ export function RecordPanel() {
         {recorderStatus?.error ? <div className="rec-error">{recorderStatus.error}</div> : null}
 
         <div className="field">
-          <label>Шины для записи</label>
+          <label>{t('rec.buses')}</label>
           <div className="rec-buses">
             {BUS_ORDER.map((bus) => (
               <button
@@ -92,7 +94,7 @@ export function RecordPanel() {
                 type="button"
                 className={`mini-toggle${recorder.buses.includes(bus) ? ' on' : ''}`}
                 onClick={() => toggleBuss(bus)}
-                data-tip={`${recorder.buses.includes(bus) ? 'Убрать' : 'Добавить'} шину ${bus} (${buses[bus].name}) ${recorder.buses.includes(bus) ? 'из' : 'в'} запись`}
+                data-tip={recorder.buses.includes(bus) ? t('rec.removeBus', { bus, name: buses[bus].name }) : t('rec.addBus', { bus, name: buses[bus].name })}
               >
                 {bus}
               </button>
@@ -102,21 +104,21 @@ export function RecordPanel() {
 
         <div className="field-row">
           <div className="field grow">
-            <label htmlFor="rec-format">Формат</label>
+            <label htmlFor="rec-format">{t('rec.format')}</label>
             <Select
               value={recorder.format}
               options={[
-                { value: 'wav', label: 'WAV (без потерь)' },
-                { value: 'flac', label: 'FLAC — скоро', disabled: true },
-                { value: 'mp3', label: 'MP3 — скоро', disabled: true },
+                { value: 'wav', label: t('rec.wavLossless') },
+                { value: 'flac', label: `FLAC ${t('rec.soon')}`, disabled: true },
+                { value: 'mp3', label: `MP3 ${t('rec.soon')}`, disabled: true },
               ]}
               onChange={(val) => setRecorder({ format: val as typeof recorder.format })}
-              hint="Формат файла записи"
+              hint={t('rec.formatHint')}
               small
             />
           </div>
           <div className="field" style={{ width: 92 }}>
-            <label htmlFor="rec-depth">Битность</label>
+            <label htmlFor="rec-depth">{t('rec.bitDepth')}</label>
             <Select
               value={String(recorder.bitDepth)}
               options={[
@@ -131,30 +133,30 @@ export function RecordPanel() {
         </div>
 
         <div className="field">
-          <label htmlFor="rec-dir">Папка назначения</label>
+          <label htmlFor="rec-dir">{t('rec.dir')}</label>
           <div className="field-row">
             <input
               id="rec-dir"
               className="text-input grow"
-              placeholder="Музыка / Nexus-Mixer"
+              placeholder={t('rec.dirPlaceholder')}
               value={recorder.directory}
               onChange={(event) => setRecorder({ directory: event.target.value })}
             />
-            <button type="button" className="btn small" onClick={() => notify('Введите полный путь к папке вручную')}>
+            <button type="button" className="btn small" onClick={() => notify(t('rec.dirNote'))}>
               <FolderOpen size={12} />
             </button>
           </div>
         </div>
 
         <div className="field">
-          <label htmlFor="rec-split">Разбивать файл каждые</label>
+          <label htmlFor="rec-split">{t('rec.split')}</label>
           <Select
             value={String(recorder.splitMinutes)}
             options={[
-              { value: '0', label: 'Не разбивать' },
-              { value: '15', label: '15 минут' },
-              { value: '30', label: '30 минут' },
-              { value: '60', label: '60 минут' },
+              { value: '0', label: t('rec.splitNo') },
+              { value: '15', label: t('rec.minutes', { n: 15 }) },
+              { value: '30', label: t('rec.minutes', { n: 30 }) },
+              { value: '60', label: t('rec.minutes', { n: 60 }) },
             ]}
             onChange={(val) => setRecorder({ splitMinutes: Number(val) })}
             small
@@ -162,11 +164,7 @@ export function RecordPanel() {
         </div>
       </div>
 
-      <div className="fx-note">
-        Запись идёт с выбранных шин после обработки. Сейчас пишется WAV (16/24-bit PCM
-        или 32-bit float); FLAC/MP3 появятся вместе с кодеками. Файлы сохраняются
-        в указанную папку.
-      </div>
+      <div className="fx-note">{t('rec.note')}</div>
     </>
   )
 }

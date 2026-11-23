@@ -1,5 +1,7 @@
-import { useRef, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react'
+import {
+  useRef, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react'
 import { FADER_MAX, FADER_MIN, clamp } from '../../lib/format'
+import { t } from '../../i18n'
 
 interface FaderProps {
   value: number
@@ -21,7 +23,7 @@ export function Fader({
   min = FADER_MIN,
   max = FADER_MAX,
   ticks = DEFAULT_TICKS,
-  ariaLabel = 'Уровень',
+  ariaLabel = t('tip.level'),
   hint,
 }: FaderProps) {
   const ref = useRef<HTMLDivElement>(null)
@@ -76,7 +78,7 @@ export function Fader({
       ref={ref}
       className="fader"
       style={{ '--strip-color': color ?? 'var(--accent)' } as CSSProperties}
-      data-tip={hint ?? `${ariaLabel} — тяните, двойной клик сбрасывает на 0 dB`}
+      data-tip={hint ?? t('tip.dragReset', { label: ariaLabel })}
       role="slider"
       tabIndex={0}
       aria-label={ariaLabel}

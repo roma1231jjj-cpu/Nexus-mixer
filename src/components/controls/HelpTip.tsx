@@ -1,5 +1,7 @@
-import { Info } from 'lucide-react'
+import {
+  Info } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
+import { t } from '../../i18n'
 
 interface HelpTipProps {
   text: string
@@ -25,8 +27,8 @@ export function HelpTip({ text, side = 'bottom' }: HelpTipProps) {
         type="button"
         className="help-tip-btn"
         onClick={() => setShow(!show)}
-        aria-label="Справка"
-        title="Что это?"
+        aria-label={t('help.aria')}
+        title={t('help.title')}
       >
         <Info size={12} />
       </button>

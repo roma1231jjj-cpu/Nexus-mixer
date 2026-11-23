@@ -1,5 +1,7 @@
-import { useEffect, useRef } from 'react'
+import {
+  useEffect, useRef } from 'react'
 import { meterTarget } from '../../audio/meterBus'
+import { t } from '../../i18n'
 
 interface SpectrumAnalyzerProps {
   /** Width of the canvas. */
@@ -109,7 +111,7 @@ export function SpectrumAnalyzer({
       ref={canvasRef}
       className="spectrum-canvas"
       style={{ width, height }}
-      aria-label="Спектроанализатор"
+      aria-label={t('spectrum.aria')}
     />
   )
 }

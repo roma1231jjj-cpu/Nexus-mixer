@@ -1,0 +1,48 @@
+export const misc = {
+  'common.choose': 'Выберите…',
+  'tip.level': 'Уровень',
+  'tip.dragReset': '{label} — тяните, двойной клик сбрасывает на 0 dB',
+  'knob.dragReset': '{label} — тяните вверх/вниз, двойной клик сбрасывает',
+  'help.aria': 'Справка',
+  'help.title': 'Что это?',
+  'spectrum.aria': 'Спектроанализатор',
+
+  'engine.desktopOnly': 'Аудиодвижок доступен только в desktop-сборке Tauri',
+  'engine.startFailed': 'Не удалось запустить аудиодвижок',
+  'engine.stopFailed': 'Не удалось остановить аудиодвижок',
+  'engine.restartFailed': 'Не удалось восстановить аудиодвижок',
+  'engine.restart': 'Перезапуск аудиодвижка: {reason}',
+  'engine.reasonLost': 'потеряно устройство',
+  'engine.reasonChanged': 'изменено устройство',
+  'engine.reasonStopped': 'аудиопоток остановился',
+  'ai.desktopOnly': 'AI-sidecar доступен только в desktop-сборке Tauri',
+  'ai.connectError': 'Не удалось подключиться к sidecar',
+  'ai.disconnectError': 'Не удалось отключить sidecar',
+  'ai.pingError': 'Sidecar не ответил на ping',
+
+  'preset.defaultName': 'Мой пресет',
+  'preset.savedFrom': 'Сохранено с канала {name}',
+
+  'intent.bass.boost': 'Усиление низких частот: +4 dB на 80 Гц (lowshelf)',
+  'intent.bass.cut': 'Срез ультра-низов (-3 dB на 40 Гц) для чистоты',
+  'intent.echo.delay': 'Задержка шины: 90 мс',
+  'intent.echo.width': 'Стерео ширина: 130%',
+  'intent.bright.shelf': 'Подъём высоких: +3 dB на 10 кГц (highshelf)',
+  'intent.clear.cut': 'Срез грязных низов: -3 dB на 300 Гц',
+  'intent.clear.presence': 'Подъём присутствия: +2.5 dB на 4 кГц',
+  'intent.clear.deesser': 'De-Esser: включение на 6.5 кГц',
+  'intent.noise.gate': 'Шумоподавление: Gate -54 dB, range -40',
+  'intent.loud.gain': 'Увеличение громкости: +3 dB',
+  'intent.warm.sat': 'Сатиратор: drive 35%, tone -20%, mix 30%',
+  'intent.warm.lows': 'Мягкий подъём низов: +2 dB на 120 Гц',
+  'intent.comp': 'Компрессор: ratio 6:1, threshold -24 dB',
+  'intent.width': 'Стерео ширина: 140%',
+  'intent.limiter': 'Лимитер на шине: ceiling -1.5 dB, release 80 ms',
+  'intent.reset': 'Сброс FX на умолчания',
+  'intent.applied': 'Применено изменений: {count} — {list}',
+  'intent.nothing': 'Ничего не изменилось',
+
+  'settings.langSwitch': 'Язык интерфейса',
+}
+
+export type Misc = typeof misc

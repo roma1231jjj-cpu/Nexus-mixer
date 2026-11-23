@@ -3,8 +3,11 @@ import { Camera, Download, Trash2, Upload } from 'lucide-react'
 import { useMixer } from '../../store/useMixer'
 import { useUi } from '../../store/useUi'
 import { captureSnapshot, applySnapshot, loadScenes, saveScenes, deleteScene, type SceneSnapshot } from '../../lib/sceneSnapshot'
+import { useT, useLocale } from '../../i18n'
 
 export function ScenePanel() {
+  const t = useT()
+  const locale = useLocale()
   const setStrip = useMixer((s) => s.setStrip)
   const setStripFx = useMixer((s) => s.setStripFx)
   const setStripEqBand = useMixer((s) => s.setStripEqBand)
@@ -30,7 +33,7 @@ export function ScenePanel() {
     setScenes(updated)
     saveScenes(updated)
     setName('')
-    notify(`Сцена «${n}» сохранена`)
+    notify(t('scene.saved', { name: n }))
   }
 
   const handleApply = (snap: SceneSnapshot) => {
@@ -48,7 +51,7 @@ export function ScenePanel() {
       setMasterGainDb: setMasterGainDb as never,
       setVcaGroups: setVcaGroups as never,
     })
-    notify(`Сцена «${snap.name}» загружена: ${details.length} каналов`)
+    notify(t('scene.loaded', { name: snap.name, count: details.length }))
   }
 
   const handleExport = (snap: SceneSnapshot) => {
@@ -59,7 +62,7 @@ export function ScenePanel() {
     a.download = `nexus-scene-${snap.name.replace(/[^a-zA-Zа-яА-Я0-9-_]/g, '_')}.json`
     a.click()
     URL.revokeObjectURL(url)
-    notify(`Сцена «${snap.name}» экспортирована`)
+    notify(t('scene.exported', { name: snap.name }))
   }
 
   const handleImport = () => {
@@ -76,9 +79,9 @@ export function ScenePanel() {
         const updated = [...scenes, snap]
         setScenes(updated)
         saveScenes(updated)
-        notify(`Сцена «${snap.name}» импортирована`)
+        notify(t('scene.imported', { name: snap.name }))
       } catch {
-        notify('Ошибка: неверный формат файла')
+        notify(t('scene.badFile'))
       }
     }
     input.click()
@@ -96,29 +99,29 @@ export function ScenePanel() {
         <span className="fx-icon">
           <Camera size={13} />
         </span>
-        <span className="fx-title">Scene Snapshots</span>
-        <span className="fx-sub">{scenes.length} сцен</span>
+        <span className="fx-title">{t('scene.title')}</span>
+        <span className="fx-sub">{t('scene.count', { n: scenes.length })}</span>
       </header>
       <div className="fx-block-body">
         <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
           <input
             className="text-input"
             style={{ flex: 1, height: 28, fontSize: 11 }}
-            placeholder="Название сцены…"
+            placeholder={t('scene.namePlaceholder')}
             value={name}
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') handleCapture() }}
           />
           <button type="button" className="btn primary small" onClick={handleCapture} disabled={!name.trim() && scenes.length < 99}>
-            <Camera size={12} /> Снять
+            <Camera size={12} /> {t('scene.capture')}
           </button>
-          <button type="button" className="btn small" onClick={handleImport} title="Импорт из JSON">
+          <button type="button" className="btn small" onClick={handleImport} title={t('scene.importTip')}>
             <Upload size={12} />
           </button>
         </div>
 
         {scenes.length === 0 ? (
-          <div className="empty">Нет сохранённых сцен. Назовите и нажмите «Снять».</div>
+          <div className="empty">{t('scene.empty')}</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 200, overflowY: 'auto' }}>
             {[...scenes].reverse().map((snap) => (
@@ -138,15 +141,15 @@ export function ScenePanel() {
                   {snap.name}
                 </span>
                 <span style={{ fontSize: 8, color: 'var(--faint)', fontFamily: 'var(--font-mono)' }}>
-                  {new Date(snap.savedAt).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                  {new Date(snap.savedAt).toLocaleString(locale, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                 </span>
-                <button type="button" className="icon-btn" style={{ width: 22, height: 22 }} onClick={() => handleApply(snap)} title="Загрузить">
+                <button type="button" className="icon-btn" style={{ width: 22, height: 22 }} onClick={() => handleApply(snap)} title={t('scene.load')}>
                   <Download size={11} />
                 </button>
-                <button type="button" className="icon-btn" style={{ width: 22, height: 22 }} onClick={() => handleExport(snap)} title="Экспорт">
+                <button type="button" className="icon-btn" style={{ width: 22, height: 22 }} onClick={() => handleExport(snap)} title={t('scene.export')}>
                   <Upload size={11} />
                 </button>
-                <button type="button" className="icon-btn" style={{ width: 22, height: 22, color: 'var(--bad)' }} onClick={() => handleDelete(snap.id)} title="Удалить">
+                <button type="button" className="icon-btn" style={{ width: 22, height: 22, color: 'var(--bad)' }} onClick={() => handleDelete(snap.id)} title={t('scene.delete')}>
                   <Trash2 size={11} />
                 </button>
               </div>

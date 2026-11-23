@@ -10,6 +10,7 @@ import { EqBands } from './EqBands'
 import { HelpTip } from '../controls/HelpTip'
 import { Select } from '../controls/Select'
 import { BUS_ORDER } from '../../data/defaults'
+import { useT, useLocale } from '../../i18n'
 
 function FxBlock({
   icon,
@@ -28,6 +29,7 @@ function FxBlock({
   help?: string
   children: ReactNode
 }) {
+  const t = useT()
   return (
     <section className={`fx-block${enabled === false ? ' disabled' : ''}`}>
       <header className="fx-block-head">
@@ -36,7 +38,7 @@ function FxBlock({
         {help ? <HelpTip text={help} /> : null}
         <span className="fx-sub">{sub}</span>
         {onToggle ? (
-          <Switch on={Boolean(enabled)} onChange={onToggle} ariaLabel={`Включить ${title}`} />
+          <Switch on={Boolean(enabled)} onChange={onToggle} ariaLabel={t('rack.enable', { title })} />
         ) : null}
       </header>
       <div className="fx-block-body">{children}</div>
@@ -49,6 +51,8 @@ const sign = (value: number): string => `${value > 0 ? '+' : ''}${value.toFixed(
 const BUS_LABELS = (id: BusId): string => id
 
 export function StripFx({ strip }: { strip: Strip }) {
+  const t = useT()
+  const locale = useLocale()
   const setStrip = useMixer((s) => s.setStrip)
   const setStripFx = useMixer((s) => s.setStripFx)
   const setStripEqBand = useMixer((s) => s.setStripEqBand)
@@ -71,8 +75,8 @@ export function StripFx({ strip }: { strip: Strip }) {
     <>
       <FxBlock
         icon={<SlidersHorizontal size={13} />}
-        title="Preamp"
-        sub={`${strip.kind === 'virtual' ? 'virtual' : 'hardware'} · trim`}
+        title={t('fx.preamp')}
+        sub={t('fx.preampSub', { kind: strip.kind === 'virtual' ? t('fx.kind.virtual') : t('fx.kind.hardware') })}
       >
         <div className="knob-row">
           <Knob
@@ -131,11 +135,11 @@ export function StripFx({ strip }: { strip: Strip }) {
           </button>
         </div>
         <div className="field" style={{ marginTop: 10 }}>
-          <label htmlFor={`device-${strip.id}`}>Вход</label>
+          <label htmlFor={`device-${strip.id}`}>{t('fx.input')}</label>
           <Select
             value={strip.deviceId}
             options={[
-              { value: '', label: '— не назначено —' },
+              { value: '', label: t('fx.notAssigned') },
               ...devices
                 .filter((device) => device.kind === 'input' || device.kind === 'virtual-capture')
                 .map((device) => ({ value: device.id, label: device.name })),
@@ -145,14 +149,13 @@ export function StripFx({ strip }: { strip: Strip }) {
         </div>
       </FxBlock>
 
-      {/* Routing Sends — крутилки уровня отправки в каждую шину */}
       <section className="fx-block">
         <header className="fx-block-head">
           <span className="fx-icon">
             <SlidersHorizontal size={13} />
           </span>
-          <span className="fx-title">Sends</span>
-          <span className="fx-sub">bus levels</span>
+          <span className="fx-title">{t('fx.sends')}</span>
+          <span className="fx-sub">{t('fx.sendsSub')}</span>
         </header>
         <div className="fx-block-body">
           <div className="routing-sends">
@@ -189,11 +192,11 @@ export function StripFx({ strip }: { strip: Strip }) {
 
       <FxBlock
         icon={<Activity size={13} />}
-        title="Noise Gate"
-        sub={gate.enabled ? `${gate.threshold.toFixed(0)} dB · ${gate.range.toFixed(0)} dB` : 'bypass'}
+        title={t('fx.gate')}
+        sub={gate.enabled ? `${gate.threshold.toFixed(0)} dB · ${gate.range.toFixed(0)} dB` : t('fx.bypass')}
         enabled={gate.enabled}
         onToggle={(value) => setStripFx(strip.id, { gate: { ...gate, enabled: value } })}
-        help="Шумоподавитель — отключает звук когда уровень сигнала ниже порога (THRESH). Нормальный порог: от -60 до -36 dB. RANGE — насколько сильно ослаблять закрытый шум."
+        help={t('fx.gateHelp')}
       >
         <div className="knob-row">
           <Knob
@@ -251,15 +254,15 @@ export function StripFx({ strip }: { strip: Strip }) {
 
       <FxBlock
         icon={<Gauge size={13} />}
-        title="Compressor"
+        title={t('fx.compressor')}
         sub={
           compressor.enabled
             ? `${compressor.threshold.toFixed(0)} dB · ${compressor.ratio.toFixed(1)}:1 · ${sign(compressor.makeup)}`
-            : 'bypass'
+            : t('fx.bypass')
         }
         enabled={compressor.enabled}
         onToggle={(value) => setStripFx(strip.id, { compressor: { ...compressor, enabled: value } })}
-        help="Компрессор — выравнивает громкость, делая тихие части громче, а громкие тише. THRESH: порог срабатывания. RATIO: степень сжатия (2:1 — мягко, 8:1 — сильно)."
+        help={t('fx.compressorHelp')}
       >
         <div className="knob-row">
           <Knob
@@ -328,7 +331,7 @@ export function StripFx({ strip }: { strip: Strip }) {
         </div>
         {/* Makeup gain is a real parameter; live gain reduction is not exposed by
             the engine yet, so we do not fake a GR meter. */}
-        <div className="fx-section-divider">Makeup gain</div>
+        <div className="fx-section-divider">{t('fx.makeupGain')}</div>
         <div className="gr-meter" style={{ '--gr': `${Math.min(compressor.makeup, 24) / 24 * 100}%` } as never}>
           <div className="gr-meter-fill" />
         </div>
@@ -341,8 +344,8 @@ export function StripFx({ strip }: { strip: Strip }) {
 
       <FxBlock
         icon={<AudioWaveform size={13} />}
-        title="Equalizer"
-        sub={`${eq.filter((band) => band.enabled).length}/10 bands`}
+        title={t('fx.equalizer')}
+        sub={t('fx.bands', { on: eq.filter((band) => band.enabled).length, total: 10 })}
         enabled={eqAny}
         onToggle={toggleEq}
       >
@@ -366,11 +369,11 @@ export function StripFx({ strip }: { strip: Strip }) {
 
       <FxBlock
         icon={<Scissors size={13} />}
-        title="De-Esser"
-        sub={deesser.enabled ? `${(deesser.frequency / 1000).toFixed(1)} kHz · ${deesser.amount}%` : 'bypass'}
+        title={t('fx.deesser')}
+        sub={deesser.enabled ? `${(deesser.frequency / 1000).toFixed(1)} kHz · ${deesser.amount}%` : t('fx.bypass')}
         enabled={deesser.enabled}
         onToggle={(value) => setStripFx(strip.id, { deesser: { ...deesser, enabled: value } })}
-        help="Деэссер — убирает шипящие звуки (с, ш, щ, ч). Частота 4–8 kHz. Amount — сила подавления. Начните с 5 kHz / 50%."
+        help={t('fx.deesserHelp')}
       >
         <div className="knob-row">
           <Knob
@@ -408,11 +411,11 @@ export function StripFx({ strip }: { strip: Strip }) {
 
       <FxBlock
         icon={<Flame size={13} />}
-        title="Saturator"
-        sub={saturator.enabled ? `${saturator.drive}% drive · ${saturator.mix}% mix` : 'bypass'}
+        title={t('fx.saturator')}
+        sub={saturator.enabled ? `${saturator.drive}% drive · ${saturator.mix}% mix` : t('fx.bypass')}
         enabled={saturator.enabled}
         onToggle={(value) => setStripFx(strip.id, { saturator: { ...saturator, enabled: value } })}
-        help="Сатуратор — добавляет гармонические искажения для теплоты и насыщенности. DRIVE: сила искажения. MIX: пропорция с оригиналом. 20-40% drive достаточно для лёгкого эффекта."
+        help={t('fx.saturatorHelp')}
       >
         <div className="knob-row">
           <Knob
@@ -453,14 +456,14 @@ export function StripFx({ strip }: { strip: Strip }) {
           type="button"
           className="btn"
           onClick={() => {
-            savePreset(`${strip.name} · ${new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`)
-            notify('Текущая цепочка сохранена как пресет')
+            savePreset(`${strip.name} · ${new Date().toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}`)
+            notify(t('fx.presetSaved'))
           }}
         >
-          <Save size={13} /> Сохранить пресет
+          <Save size={13} /> {t('fx.savePreset')}
         </button>
         <button type="button" className="btn primary" onClick={() => openRack('ai')}>
-          <Sparkles size={13} /> ИИ-голос
+          <Sparkles size={13} /> {t('fx.aiVoice')}
         </button>
       </div>
     </>

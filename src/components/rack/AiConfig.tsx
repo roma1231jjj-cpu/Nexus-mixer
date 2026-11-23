@@ -4,8 +4,10 @@ import type { EqBand } from '../../types'
 import { useMixer } from '../../store/useMixer'
 import { useUi } from '../../store/useUi'
 import { parseIntent, applyIntents, type ParsedIntent } from '../../lib/intentParser'
+import { useT } from '../../i18n'
 
 export function AiConfig() {
+  const t = useT()
   const strip = useMixer((s) => s.strips[s.selectedStripId])
   const bus = useMixer((s) => s.buses[s.selectedBusId])
   const selectionKind = useMixer((s) => s.selectionKind)
@@ -94,7 +96,7 @@ export function AiConfig() {
         <span className="fx-icon">
           <Wand2 size={13} />
         </span>
-        <span className="fx-title">Быстрая настройка</span>
+        <span className="fx-title">{t('cfg.title')}</span>
         <span className="fx-sub">{target?.name ?? '—'}</span>
       </header>
       <div className="fx-block-body">
@@ -109,11 +111,7 @@ export function AiConfig() {
               lineHeight: 1.5,
               fontFamily: 'var(--font-ui)',
             }}
-            placeholder={
-              selectionKind === 'strip'
-                ? 'Опиши звук словами…\n\nНапример:\n• "Сделай звук глубже и добавь эха"\n• "Чище голос, убери шум"\n• "Теплее, мягче, с компрессией"\n• "Ярче и громче"\n• "Сброс"'
-                : 'Bus: "Добавь простора и мастер-лимитер"'
-            }
+            placeholder={selectionKind === 'strip' ? t('cfg.placeholder') : t('cfg.placeholderBus')}
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -127,7 +125,7 @@ export function AiConfig() {
               onClick={handleAnalyze}
               style={{ flex: 1 }}
             >
-              <Wand2 size={13} /> Анализ
+              <Wand2 size={13} /> {t('cfg.analyze')}
             </button>
             <button
               type="button"
@@ -136,14 +134,14 @@ export function AiConfig() {
               onClick={handleApply}
               style={{ flex: 1 }}
             >
-              <Sparkles size={13} /> {busy ? '…' : 'Применить'}
+              <Sparkles size={13} /> {busy ? '…' : t('cfg.apply')}
             </button>
             <button
               type="button"
               className="btn"
               disabled={!text && !parsed}
               onClick={handleReset}
-              title="Очистить"
+              title={t('cfg.clear')}
             >
               <RotateCcw size={13} />
             </button>
@@ -152,7 +150,7 @@ export function AiConfig() {
           {/* Parsed intents */}
           {parsed && parsed.length > 0 && (
             <div style={{ marginTop: 4 }}>
-              <div className="fx-section-divider">Распознано</div>
+              <div className="fx-section-divider">{t('cfg.recognized')}</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 6 }}>
                 {parsed.map((intent, i) => (
                   <div
@@ -174,7 +172,7 @@ export function AiConfig() {
                       </div>
                       {intent.changes.map((change, j) => (
                         <div key={j} style={{ fontSize: 10, color: 'var(--muted)', paddingLeft: 4 }}>
-                          {change.description}
+                          {t(change.descriptionKey)}
                         </div>
                       ))}
                     </div>
@@ -197,7 +195,7 @@ export function AiConfig() {
                 lineHeight: 1.5,
               }}
             >
-              ⚠️ Ничего не распознано. Попробуй другие слова (см. подсказку в поле ввода).
+              {t('cfg.nothing')}
             </div>
           )}
 

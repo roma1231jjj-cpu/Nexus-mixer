@@ -4,12 +4,12 @@
  */
 
 import type { Bus, BusFx, EqBand, Strip, StripFx } from '../types'
+import { t, type TKey } from '../i18n'
 
 /* ──────────────────── intent types ──────────────────── */
 
 export interface ParamChange {
-  /** Human-readable description, e.g. "Boost lows by +4 dB" */
-  description: string
+  descriptionKey: TKey
   /** Apply this change to the selected strip/bus. Returns list of changed params. */
   apply(strip: Strip, bus: Bus, ctx: ApplyCtx): string[]
 }
@@ -45,7 +45,7 @@ const INTENTS: { words: string[]; changes: ParamChange[] }[] = [
     words: ['глубок', 'бас', 'низк', 'бум', 'bass', 'deep', 'low', 'boom', 'sub'],
     changes: [
       {
-        description: 'Усиление низких частот: +4 dB на 80 Гц (lowshelf)',
+        descriptionKey: 'intent.bass.boost',
         apply(strip, _bus, ctx) {
           const bands = strip.fx.eq
           const existing = findBand(bands, (b) => b.type === 'lowshelf' && b.enabled)
@@ -62,7 +62,7 @@ const INTENTS: { words: string[]; changes: ParamChange[] }[] = [
         },
       },
       {
-        description: 'Срез ультра-низов (-3 dB на 40 Гц) для чистоты',
+        descriptionKey: 'intent.bass.cut',
         apply(strip, _bus, ctx) {
           const bands = strip.fx.eq
           const existing = findBand(bands, (b) => b.type === 'highpass' && b.enabled)
@@ -86,14 +86,14 @@ const INTENTS: { words: string[]; changes: ParamChange[] }[] = [
     words: ['эх', 'задержк', 'реверб', 'echo', 'delay', 'reverb', 'reverberation', 'space'],
     changes: [
       {
-        description: 'Задержка шины: 90 мс',
+        descriptionKey: 'intent.echo.delay',
         apply(_strip, bus, ctx) {
           ctx.setBusFx(bus.id, { delayMs: 90 })
           return ['Bus delay 90 ms']
         },
       },
       {
-        description: 'Стерео ширина: 130%',
+        descriptionKey: 'intent.echo.width',
         apply(_strip, bus, ctx) {
           ctx.setBusFx(bus.id, { width: 130 })
           return ['Bus width 130%']
@@ -107,7 +107,7 @@ const INTENTS: { words: string[]; changes: ParamChange[] }[] = [
     words: ['ярк', 'высок', 'светл', 'воздух', 'bright', 'high', 'air', 'airy', 'shine'],
     changes: [
       {
-        description: 'Подъём высоких: +3 dB на 10 кГц (highshelf)',
+        descriptionKey: 'intent.bright.shelf',
         apply(strip, _bus, ctx) {
           const bands = strip.fx.eq
           const existing = findBand(bands, (b) => b.type === 'highshelf' && b.enabled)
@@ -131,7 +131,7 @@ const INTENTS: { words: string[]; changes: ParamChange[] }[] = [
     words: ['чист', 'прозрач', 'ясн', 'clear', 'clarity', 'voice', 'vocal', 'понятн'],
     changes: [
       {
-        description: 'Срез грязных низов: -3 dB на 300 Гц',
+        descriptionKey: 'intent.clear.cut',
         apply(strip, _bus, ctx) {
           const bands = strip.fx.eq
           const existing = findBand(bands, (b) => b.type === 'peaking' && b.enabled && Math.abs(b.freq - 300) < 100)
@@ -148,7 +148,7 @@ const INTENTS: { words: string[]; changes: ParamChange[] }[] = [
         },
       },
       {
-        description: 'Подъём присутствия: +2.5 dB на 4 кГц',
+        descriptionKey: 'intent.clear.presence',
         apply(strip, _bus, ctx) {
           const bands = strip.fx.eq
           const existing = findBand(bands, (b) => b.type === 'peaking' && b.enabled && Math.abs(b.freq - 4000) < 1000)
@@ -165,7 +165,7 @@ const INTENTS: { words: string[]; changes: ParamChange[] }[] = [
         },
       },
       {
-        description: 'De-Esser: включение на 6.5 кГц',
+        descriptionKey: 'intent.clear.deesser',
         apply(strip, _bus, ctx) {
           ctx.setStripFx(strip.id, {
             deesser: { ...strip.fx.deesser, enabled: true, frequency: 6500, threshold: -32, amount: 50 },
@@ -181,7 +181,7 @@ const INTENTS: { words: string[]; changes: ParamChange[] }[] = [
     words: ['шум', 'тиш', 'gate', 'noise', 'шип', 'hum', 'фон'],
     changes: [
       {
-        description: 'Шумоподавление: Gate -54 dB, range -40',
+        descriptionKey: 'intent.noise.gate',
         apply(strip, _bus, ctx) {
           ctx.setStripFx(strip.id, {
             gate: { ...strip.fx.gate, enabled: true, threshold: -54, range: -40, attack: 2, hold: 60, release: 150 },
@@ -197,7 +197,7 @@ const INTENTS: { words: string[]; changes: ParamChange[] }[] = [
     words: ['громк', 'сильн', 'loud', 'louder', 'volume', 'boost'],
     changes: [
       {
-        description: 'Увеличение громкости: +3 dB',
+        descriptionKey: 'intent.loud.gain',
         apply(strip, _bus, ctx) {
           ctx.setStrip(strip.id, { gainDb: Math.min(strip.gainDb + 3, 12) })
           return [`Gain +3 dB → ${(strip.gainDb + 3).toFixed(1)} dB`]
@@ -211,7 +211,7 @@ const INTENTS: { words: string[]; changes: ParamChange[] }[] = [
     words: ['тепл', 'мягк', 'warm', 'warmth', 'soft', 'уютн', 'лампов'],
     changes: [
       {
-        description: 'Сатиратор: drive 35%, tone -20%, mix 30%',
+        descriptionKey: 'intent.warm.sat',
         apply(strip, _bus, ctx) {
           ctx.setStripFx(strip.id, {
             saturator: {
@@ -226,7 +226,7 @@ const INTENTS: { words: string[]; changes: ParamChange[] }[] = [
         },
       },
       {
-        description: 'Мягкий подъём низов: +2 dB на 120 Гц',
+        descriptionKey: 'intent.warm.lows',
         apply(strip, _bus, ctx) {
           const bands = strip.fx.eq
           const existing = findBand(bands, (b) => b.type === 'lowshelf' && b.enabled)
@@ -250,7 +250,7 @@ const INTENTS: { words: string[]; changes: ParamChange[] }[] = [
     words: ['сжат', 'плотн', 'compres', 'compressor', 'ровн', 'динамик'],
     changes: [
       {
-        description: 'Компрессор: ratio 6:1, threshold -24 dB',
+        descriptionKey: 'intent.comp',
         apply(strip, _bus, ctx) {
           ctx.setStripFx(strip.id, {
             compressor: {
@@ -275,7 +275,7 @@ const INTENTS: { words: string[]; changes: ParamChange[] }[] = [
     words: ['простор', 'шир', 'стерео', 'width', 'space', 'wide', 'stereo', 'объем'],
     changes: [
       {
-        description: 'Стерео ширина: 140%',
+        descriptionKey: 'intent.width',
         apply(_strip, bus, ctx) {
           ctx.setBusFx(bus.id, { width: 140 })
           return ['Bus width 140%']
@@ -289,7 +289,7 @@ const INTENTS: { words: string[]; changes: ParamChange[] }[] = [
     words: ['master', 'финал', 'polish', 'мастер', 'выход'],
     changes: [
       {
-        description: 'Лимитер на шине: ceiling -1.5 dB, release 80 ms',
+        descriptionKey: 'intent.limiter',
         apply(_strip, bus, ctx) {
           ctx.setBusFx(bus.id, { limiter: { ...bus.fx.limiter, enabled: true, ceiling: -1.5, release: 80 } })
           return ['Bus limiter enabled (ceiling -1.5 dB)']
@@ -303,7 +303,7 @@ const INTENTS: { words: string[]; changes: ParamChange[] }[] = [
     words: ['сброс', 'очист', 'reset', 'clear', 'default', 'начальн'],
     changes: [
       {
-        description: 'Сброс FX на умолчания',
+        descriptionKey: 'intent.reset',
         apply(strip, _bus, ctx) {
           ctx.setStripFx(strip.id, {
             gate: { ...strip.fx.gate, enabled: false, threshold: -48, range: -60, attack: 5, hold: 80, release: 220 },
@@ -377,8 +377,8 @@ export function applyIntents(
 
   const summary =
     details.length > 0
-      ? `✅ Применено ${details.length} изменений: ${details.join('; ')}`
-      : '⚠️ Ничего не изменилось'
+      ? t('intent.applied', { count: details.length, list: details.join('; ') })
+      : t('intent.nothing')
 
   return { summary, details }
 }

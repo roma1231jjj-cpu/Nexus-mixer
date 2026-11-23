@@ -4,15 +4,41 @@
 Микрофон, музыка, браузер, игры и Discord — в одной консоли с DSP, маршрутизацией
 и голосовыми эффектами в реальном времени.
 
+[English version](README.en.md)
+
 [![Release](https://img.shields.io/github/v/release/roma1231jjj-cpu/Nexus-mixer?style=flat-square&label=release&color=8b5cf6)](https://github.com/roma1231jjj-cpu/Nexus-mixer/releases/latest)
 [![Tests](https://img.shields.io/badge/tests-54%20passed-2ea043?style=flat-square)](#тесты)
 [![Windows](https://img.shields.io/badge/platform-Windows%2010%2F11-4b5563?style=flat-square)](#установка)
 [![Tauri](https://img.shields.io/badge/Tauri-2-24c8db?style=flat-square)](https://tauri.app)
 [![Rust](https://img.shields.io/badge/Rust-realtime-b7410e?style=flat-square)](https://www.rust-lang.org)
 
-> **Nexus × АутSquad** · v0.4.0 · Windows 10/11 x64
+> **Nexus × АутSquad** · v0.4.0 · Windows 10/11 x64 · интерфейс на русском и английском
 
-![Nexus-Mixer — Nexus-Noir](.shots/nexus-noir-0.4.0.png)
+| Консоль | Настройки | Инструкция |
+| --- | --- | --- |
+| ![](docs/screenshots/ru-rack.png) | ![](docs/screenshots/ru-settings.png) | ![](docs/screenshots/ru-guide.png) |
+
+Приборная панель, а не сайт: каналы, метры, маршрутизация и шины видны сразу,
+без вкладок и лишних кликов.
+
+---
+
+## Язык интерфейса
+
+Интерфейс полностью двуязычный — русский и английский. Переключение мгновенное,
+без перезагрузки окна и без перезапуска движка.
+
+- Кнопка **RU / EN** в тулбаре — справа, рядом с инструкцией.
+- **Настройки → Интерфейс и поведение → Язык интерфейса** — там же переключатель
+  на два положения.
+- Выбор записывается в `localStorage` под ключом `nm-lang` и переживает
+  перезапуск приложения. По умолчанию — русский.
+- Названия каналов, шин и пресетов переключаются вместе с языком; собственные
+  имена, которые вы ввели руками, остаются как есть.
+- Тексты лотов, README и страницы релизов — тоже на двух языках.
+
+Что не переводится намеренно: названия технологий (Voicemeeter, ASIO, VBAN,
+WASAPI, VAC, dB, Hz), пути к файлам и имена устройств Windows.
 
 ---
 
@@ -26,15 +52,15 @@
 | Чёрное стекло · фиолет | Матовая приборная панель | Белое стекло · синий |
 | ![](.shots/nexus-noir-0.4.0.png) | ![](.shots/nexus-studio-0.4.0.png) | ![](.shots/nexus-frost-0.4.0.png) |
 
-Каждая тема — это не просто смена цвета: пересобраны контраст текста,
-границы, свечение, фейдеры, метры, селекторы устройств и модальные окна.
-Стеклянные панели используют полупрозрачность, blur и мягкий контур, но
-сохраняют «приборный» характер: без аврор, неона и декоративного шума.
+Тема — это не смена цвета: пересобраны контраст текста, границы, свечение,
+фейдеры, метры, селекторы устройств и модальные окна.
 
 ---
 
 ## Что нового в 0.4.0
 
+- **Двуязычный интерфейс** — русский и английский, переключатель в тулбаре и в
+  настройках, без перезагрузки.
 - **Nexus-Noir** — основная чёрно-фиолетовая стеклянная тема с glow-границами.
 - **Nexus-Studio** — привычная матовая тема сохранена как отдельный скин.
 - **Nexus-Frost** — бело-синее стекло для светлого рабочего места.
@@ -50,9 +76,9 @@
 
 ## Что это
 
-Nexus-Mixer встаёт между микрофоном, приложениями и устройствами вывода. Он
-собирает звук в один микшер, обрабатывает каждый канал, раздаёт его по физическим
-и виртуальным шинам — и отдаёт Discord, OBS, Zoom и играм как обычный микрофон.
+Nexus-Mixer встаёт между микрофоном, приложениями и устройствами вывода. Мы
+собираем звук в один микшер, обрабатываем каждый канал, раздаём его по физическим
+и виртуальным шинам — и отдаём Discord, OBS, Zoom и играм как обычный микрофон.
 
 - **8 входов** — 6 аппаратных + 2 виртуальных.
 - **3 физических выхода** — наушники, вторая пара, колонки.
@@ -125,7 +151,8 @@ Nexus-Mixer встаёт между микрофоном, приложениям
 - MIDI Learn через Web MIDI.
 - Undo/Redo для FX.
 - Сохранение состояния, кастомный frameless titlebar.
-- Deep links: `?tab=ai`, `?strip=hw1`, `?bus=B1`, `?theme=studio|dark|light`, `?drawer=settings`.
+- Deep links: `?tab=ai`, `?strip=hw1`, `?bus=B1`, `?theme=studio|dark|light`,
+  `?drawer=settings`, `?lang=ru|en`.
 
 ---
 
@@ -167,6 +194,13 @@ npm run desktop:dev    # Tauri dev-окно
 npm run desktop:build  # release NSIS
 ```
 
+Проверки перед коммитом:
+
+```powershell
+npm run typecheck
+npm run build
+```
+
 Полная release-сборка с updater-артефактами:
 
 ```powershell
@@ -203,7 +237,7 @@ cargo test --all-targets
 
 | Версия | Что важно |
 | --- | --- |
-| **0.4.0** | Nexus-Studio / Nexus-Noir / Nexus-Frost, 3 формата поставки |
+| **0.4.0** | двуязычный интерфейс, Nexus-Studio / Nexus-Noir / Nexus-Frost, 3 формата поставки |
 | 0.3.1 | проверенное сквозное автообновление |
 | 0.3.0 | локальные голоса, updater, GitHub Releases |
 | 0.2.1 | 12 кабелей VAC, бархатная цепочка, стабильный старт движка |
@@ -230,8 +264,7 @@ git push origin v0.4.0
 
 Секреты репозитория:
 
-| Secret
- | Значение |
+| Secret | Значение |
 | --- | --- |
 | `TAURI_SIGNING_PRIVATE_KEY` | содержимое `nexus-updater.key` |
 
@@ -244,13 +277,14 @@ git push origin v0.4.0
 ```
 src/
   App.tsx                 каркас, deep links, auto-update check
+  i18n/                   ru.ts + en.ts, словари по разделам, useT()/t()
   components/             Strip, Bus, RoutingMatrix, UpdateBanner, SettingsDrawer
   components/rack/        FX, Voice AI, Macros, Recorder, VCA Groups
   store/useMixer.ts       zustand + persist + theme migration
   store/useUpdater.ts     Tauri updater state machine
   lib/engineBridge.ts     typed invoke bridge
   lib/useEngineBridge.ts  sync, meters, device hot-plug
-  styles/                 studio.css + console-v2.css + glass.css
+  styles/                 studio.css + console-v2.css + glass.css + lang.css
 
 src-tauri/
   src/engine/             realtime graph, WASAPI runtime, DSP, recorder
@@ -259,6 +293,7 @@ src-tauri/
   src/lib.rs              Tauri commands, tray, updater plugins
   tauri.conf.json         window, bundle, updater endpoint
 
+docs/screenshots/         снимки интерфейса RU и EN
 release/vX.Y.Z/           installer + portable exe + zip + latest.json
 docs/workflows/           CI and signed release recipes
 tools/ai-sidecar/         optional Python RVC sidecar

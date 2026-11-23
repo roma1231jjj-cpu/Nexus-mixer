@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
 import { useMixer } from './store/useMixer'
+import { useLang } from './i18n'
 import './styles/base.css'
 import './styles/layout.css'
 import './styles/panels.css'
@@ -13,6 +14,7 @@ import './styles/guide.css'
 import './styles/studio.css'
 import './styles/console-v2.css'
 import './styles/glass.css'
+import './styles/lang.css'
 
 // Re-apply the persisted theme before the first paint. `?theme=studio|light|dark`
 // keeps theme previews and screenshots deterministic.
@@ -24,6 +26,13 @@ if (requestedTheme === 'studio' || requestedTheme === 'light' || requestedTheme 
   useMixer.setState({ theme: requestedTheme })
 } else {
   document.documentElement.dataset.theme = useMixer.getState().theme
+}
+
+const requestedLang = new URLSearchParams(window.location.search).get('lang')
+if (requestedLang === 'ru' || requestedLang === 'en') {
+  useLang.setState({ lang: requestedLang })
+  document.documentElement.lang = requestedLang
+  document.documentElement.dataset.lang = requestedLang
 }
 
 createRoot(document.getElementById('root')!).render(

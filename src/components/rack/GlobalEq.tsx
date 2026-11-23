@@ -6,6 +6,7 @@ import { EqEditor } from '../controls/EqEditor'
 import { EqBands } from './EqBands'
 import { SpectrumAnalyzer } from '../controls/SpectrumAnalyzer'
 import { HelpTip } from '../controls/HelpTip'
+import { useT } from '../../i18n'
 
 /**
  * Master section EQ: applied to every bus after its own processing.
@@ -13,6 +14,7 @@ import { HelpTip } from '../controls/HelpTip'
  * snapshot, so it persists and audibly affects the output.
  */
 export function GlobalEq() {
+  const t = useT()
   const sampleRate = useMixer((s) => s.engine.sampleRate)
   const bands = useMixer((s) => s.masterEq)
   const enabled = useMixer((s) => s.masterEqEnabled)
@@ -30,9 +32,9 @@ export function GlobalEq() {
           <Waves size={13} />
         </span>
         <span className="fx-title">Master EQ</span>
-        <HelpTip text="Глобальный эквалайзер применяется ко всем шинам после их обработки. Полосы можно двигать прямо по кривой: X — частота, Y — усиление." />
-        <span className="fx-sub">{activeCount}/{bands.length} bands</span>
-        <Switch on={enabled} onChange={setMasterEqEnabled} ariaLabel="Включить Master EQ" />
+        <HelpTip text={t('eq.masterHelp')} />
+        <span className="fx-sub">{t('fx.bands', { on: activeCount, total: bands.length })}</span>
+        <Switch on={enabled} onChange={setMasterEqEnabled} ariaLabel={t('eq.masterSwitch')} />
       </header>
       <div className="fx-block-body">
         <div className="knob-row">
@@ -59,7 +61,7 @@ export function GlobalEq() {
         <div className="spectrum-wrap">
           <div className="spectrum-label">
             <span>OUTPUT SPECTRUM · A1</span>
-            <HelpTip text="Оценка спектра по live-метру шины A1. В браузерной версии метры симулируются." />
+            <HelpTip text={t('eq.spectrumHelp')} />
           </div>
           <SpectrumAnalyzer active={enabled} width={280} height={54} color="var(--accent)" source={{ kind: 'bus', index: 0 }} />
         </div>

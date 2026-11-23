@@ -1,0 +1,48 @@
+import type { Misc } from '../ru/misc'
+
+export const misc: Misc = {
+  'common.choose': 'Choose…',
+  'tip.level': 'Level',
+  'tip.dragReset': '{label} — drag to adjust, double click resets to 0 dB',
+  'knob.dragReset': '{label} — drag up or down, double click resets',
+  'help.aria': 'Help',
+  'help.title': 'What is it?',
+  'spectrum.aria': 'Spectrum analyzer',
+
+  'engine.desktopOnly': 'The audio engine is available in the Tauri desktop build only',
+  'engine.startFailed': 'The audio engine could not start',
+  'engine.stopFailed': 'The audio engine could not stop',
+  'engine.restartFailed': 'The audio engine could not recover',
+  'engine.restart': 'Audio engine restart: {reason}',
+  'engine.reasonLost': 'device lost',
+  'engine.reasonChanged': 'device changed',
+  'engine.reasonStopped': 'the audio stream stalled',
+  'ai.desktopOnly': 'The AI sidecar is available in the Tauri desktop build only',
+  'ai.connectError': 'Could not connect to the sidecar',
+  'ai.disconnectError': 'Could not disconnect the sidecar',
+  'ai.pingError': 'The sidecar did not answer the ping',
+
+  'preset.defaultName': 'My preset',
+  'preset.savedFrom': 'Saved from channel {name}',
+
+  'intent.bass.boost': 'Low end boost: +4 dB at 80 Hz (lowshelf)',
+  'intent.bass.cut': 'Ultra-low cut (-3 dB at 40 Hz) for clarity',
+  'intent.echo.delay': 'Bus delay: 90 ms',
+  'intent.echo.width': 'Stereo width: 130%',
+  'intent.bright.shelf': 'High end lift: +3 dB at 10 kHz (highshelf)',
+  'intent.clear.cut': 'Mud cut: -3 dB at 300 Hz',
+  'intent.clear.presence': 'Presence boost: +2.5 dB at 4 kHz',
+  'intent.clear.deesser': 'De-Esser: on at 6.5 kHz',
+  'intent.noise.gate': 'Noise reduction: gate -54 dB, range -40',
+  'intent.loud.gain': 'Loudness boost: +3 dB',
+  'intent.warm.sat': 'Saturator: drive 35%, tone -20%, mix 30%',
+  'intent.warm.lows': 'Gentle low lift: +2 dB at 120 Hz',
+  'intent.comp': 'Compressor: ratio 6:1, threshold -24 dB',
+  'intent.width': 'Stereo width: 140%',
+  'intent.limiter': 'Bus limiter: ceiling -1.5 dB, release 80 ms',
+  'intent.reset': 'Reset FX to defaults',
+  'intent.applied': 'Changes applied: {count} — {list}',
+  'intent.nothing': 'Nothing changed',
+
+  'settings.langSwitch': 'Interface language',
+}

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AlertTriangle, BookOpen, Cpu, HardDrive, Info, Palette, Power, RefreshCw, Settings, ShieldCheck, X } from 'lucide-react'
+import { AlertTriangle, BookOpen, Cpu, HardDrive, Info, Languages, Palette, Power, RefreshCw, Settings, ShieldCheck, X } from 'lucide-react'
 import { useMixer } from '../store/useMixer'
 import { useUi } from '../store/useUi'
 import { engineBridge } from '../lib/engineBridge'
@@ -8,8 +8,14 @@ import { Switch } from './controls/Switch'
 import { Select } from './controls/Select'
 import { BUS_ORDER } from '../data/defaults'
 import { UpdateSettings } from './UpdateSettings'
+import { RichText } from './RichText'
+import { useT, useLang, useLocale } from '../i18n'
 
 export function SettingsDrawer() {
+  const t = useT()
+  const locale = useLocale()
+  const lang = useLang((s) => s.lang)
+  const setLang = useLang((s) => s.setLang)
   const open = useMixer((s) => s.settingsOpen)
   const setOpen = useMixer((s) => s.setSettingsOpen)
   const engine = useMixer((s) => s.engine)
@@ -32,18 +38,18 @@ export function SettingsDrawer() {
     setBusy(true)
     const result = status.running ? await stopEngine() : await startEngine()
     setBusy(false)
-    if (!result.ok) notify(result.error ?? 'Ошибка аудиодвижка')
-    else notify(result.status?.running ? 'Аудиодвижок запущен' : 'Аудиодвижок остановлен')
+    if (!result.ok) notify(result.error ?? t('status.engineError'))
+    else notify(result.status?.running ? t('status.engineStarted') : t('status.engineStopped'))
   }
 
   return (
     <>
       <div className="drawer-backdrop" onClick={() => setOpen(false)} />
-      <aside className="drawer glass-strong" aria-label="Настройки">
+      <aside className="drawer glass-strong" aria-label={t('settings.title')}>
         <header className="drawer-head">
           <Settings size={16} className="accent" />
           <div>
-            <h2>Настройки</h2>
+            <h2>{t('settings.title')}</h2>
             <div className="sub">Nexus-Mixer · v0.4.0</div>
           </div>
           <button
@@ -54,12 +60,12 @@ export function SettingsDrawer() {
               setOpen(false)
               useUi.getState().setGuideOpen(true)
             }}
-            aria-label="Открыть инструкцию"
-            data-tip="Открыть инструкцию"
+            aria-label={t('settings.openGuide')}
+            data-tip={t('settings.openGuide')}
           >
             <BookOpen size={15} />
           </button>
-          <button type="button" className="icon-btn" onClick={() => setOpen(false)} aria-label="Закрыть" data-tip="Закрыть настройки (Esc)">
+          <button type="button" className="icon-btn" onClick={() => setOpen(false)} aria-label={t('settings.closeAria')} data-tip={t('settings.closeTip')}>
             <X size={15} />
           </button>
         </header>
@@ -67,23 +73,23 @@ export function SettingsDrawer() {
         <div className="drawer-body">
           <section className="settings-group">
             <span className="section-label">
-              <Cpu size={12} /> Аудиодвижок
+              <Cpu size={12} /> {t('settings.engine')}
             </span>
             <div className="setting-row">
-              <span className="s-label">API</span>
+              <span className="s-label">{t('settings.api')}</span>
               <Select
                 value={engine.api}
                 options={[
                   { value: 'wasapi-shared', label: 'WASAPI Shared' },
                   { value: 'wasapi-exclusive', label: 'WASAPI Exclusive' },
                   { value: 'asio', label: 'ASIO' },
-                  { value: 'wdm-ks', label: 'WDM-KS (низкая задержка)' },
+                  { value: 'wdm-ks', label: t('settings.wdmLowLatency') },
                 ]}
                 onChange={(val) => setEngine({ api: val as typeof engine.api })}
               />
             </div>
             <div className="setting-row">
-              <span className="s-label">Частота дискретизации</span>
+              <span className="s-label">{t('settings.sampleRate')}</span>
               <Select
                 value={String(engine.sampleRate)}
                 options={[
@@ -97,7 +103,7 @@ export function SettingsDrawer() {
               />
             </div>
             <div className="setting-row">
-              <span className="s-label">Буфер</span>
+              <span className="s-label">{t('settings.buffer')}</span>
               <Select
                 value={String(engine.bufferSize)}
                 options={[64, 128, 256, 512, 1024, 2048].map((size) => ({
@@ -108,11 +114,11 @@ export function SettingsDrawer() {
               />
             </div>
             <div className="setting-row">
-              <span className="s-label">Каналы виртуальных шин</span>
+              <span className="s-label">{t('settings.virtualChannels')}</span>
               <Select
                 value={String(engine.virtualChannels)}
                 options={[
-                  { value: '2', label: '2.0 стерео' },
+                  { value: '2', label: t('settings.channels.stereo') },
                   { value: '6', label: '5.1' },
                   { value: '8', label: '7.1' },
                 ]}
@@ -120,13 +126,13 @@ export function SettingsDrawer() {
               />
             </div>
             <div className="setting-row">
-              <span className="s-label">Clock master</span>
+              <span className="s-label">{t('settings.clockMaster')}</span>
               <Select
                 value={engine.clockMaster}
                 options={[
-                  { value: 'A1', label: 'A1 · Наушники' },
-                  { value: 'A2', label: 'A2 · Наушники 2' },
-                  { value: 'A3', label: 'A3 · Колонки' },
+                  { value: 'A1', label: t('settings.busOption', { id: 'A1', name: t('data.bus.hp1') }) },
+                  { value: 'A2', label: t('settings.busOption', { id: 'A2', name: t('data.bus.hp2') }) },
+                  { value: 'A3', label: t('settings.busOption', { id: 'A3', name: t('data.bus.speakers') }) },
                   ...BUS_ORDER.filter((id) => id.startsWith('B')).map((id) => ({ value: id, label: id })),
                 ]}
                 onChange={(val) => setEngine({ clockMaster: val as typeof engine.clockMaster })}
@@ -134,8 +140,8 @@ export function SettingsDrawer() {
             </div>
             <div className="setting-row">
               <span className="s-label">
-                Защита от дропаутов
-                <span className="s-hint"> · доп. буфер, мс</span>
+                {t('settings.safety')}
+                <span className="s-hint"> {t('settings.safetyHint')}</span>
               </span>
               <input
                 className="text-input"
@@ -150,16 +156,22 @@ export function SettingsDrawer() {
             <div className="transport">
               <div className="tp-info">
                 <div>
-                  Задержка: <b>{latency.toFixed(1)} мс</b>
-                  {status.running && runtimeInfo ? ` · буфер ${runtimeInfo.bufferSize}` : ''}
+                  {t('settings.latencyLabel')} <b>{t('settings.latencyMs', { ms: latency.toFixed(1) })}</b>
+                  {status.running && runtimeInfo ? t('settings.bufferOf', { size: runtimeInfo.bufferSize }) : ''}
                 </div>
                 <div>
                   CPU <b>{status.cpuPercent.toFixed(1)}%</b> · xruns <b>{status.xruns}</b> · SR{' '}
-                  <b>{status.sampleRate.toLocaleString('ru-RU')}</b>
+                  <b>{status.sampleRate.toLocaleString(locale)}</b>
                 </div>
                 {status.running && runtimeInfo ? (
                   <div>
-                    Потоки: <b>{runtimeInfo.inputStreams} in</b> / <b>{runtimeInfo.outputStreams} out</b>
+                    {t('settings.streams')}{' '}
+                    <b>
+                      {t('settings.streamsValue', {
+                        input: runtimeInfo.inputStreams,
+                        output: runtimeInfo.outputStreams,
+                      })}
+                    </b>
                   </div>
                 ) : null}
               </div>
@@ -169,10 +181,10 @@ export function SettingsDrawer() {
                   className={`btn small ${status.running ? 'danger' : 'primary'}`}
                   onClick={toggleEngine}
                   disabled={busy}
-                  title={status.running ? 'Остановить аудиодвижок' : 'Запустить аудиодвижок'}
+                  title={status.running ? t('status.stopTip') : t('status.startTip')}
                 >
                   <Power size={12} />
-                  {busy ? '…' : status.running ? 'Стоп' : 'Запуск'}
+                  {busy ? '…' : status.running ? t('settings.stop') : t('settings.start')}
                 </button>
               ) : (
                 <span className={`pill ${status.running ? 'good' : 'bad'}`}>
@@ -183,7 +195,7 @@ export function SettingsDrawer() {
             </div>
             {!engineBridge.available ? (
               <p className="s-hint" style={{ marginTop: 8 }}>
-                Реальный движок доступен в desktop-сборке; в браузере работает симуляция телеметрии.
+                {t('settings.demoNote')}
               </p>
             ) : null}
             {status.running && runtimeInfo && runtimeInfo.warnings.length > 0 ? (
@@ -200,29 +212,28 @@ export function SettingsDrawer() {
 
           <section className="settings-group">
             <span className="section-label">
-              <HardDrive size={12} /> Виртуальные аудиокабели
+              <HardDrive size={12} /> {t('settings.cables')}
             </span>
             <div className="driver-card">
               <div className="d-title">
                 <ShieldCheck size={14} className={status.driver.installed ? 'good' : 'warn'} />
-                Virtual Audio Cable · {status.driver.installed ? 'активен' : 'не установлен'}
+                {t('settings.vacTitle', { state: status.driver.installed ? t('settings.vacActive') : t('settings.vacMissing') })}
               </div>
               <div className="d-text">
                 {status.driver.installed
                   ? status.driver.message
-                  : 'Кабель не найден. Виртуальные шины работают в режиме эмуляции — звук остаётся внутри приложения.'}
+                  : t('settings.cableMissingText')}
                 <br /><br />
-                <b>Что это?</b> Каждый виртуальный кабель создаёт пару устройств: <b>Input</b> (куда Nexus отправляет звук) и <b>Output</b> (откуда приложения его забирают как микрофон).
+                <RichText text={t('settings.cableWhat')} />
               </div>
 
-              {/* Список обнаруженных кабелей */}
               {status.driver.installed && status.driver.cableEndpoints.length > 0 ? (
                 <div className="cable-endpoints">
-                  <div className="cable-ep-header">Обнаруженные кабели:</div>
+                  <div className="cable-ep-header">{t('settings.foundCables')}</div>
                   {status.driver.cableEndpoints.map((name, i) => (
                     <div key={i} className="cable-ep-item">
                       <span className={`pill good`} style={{ height: 18, padding: '0 6px', fontSize: 8 }}>
-                        <i className="dot" />кабель {i + 1}
+                        <i className="dot" />{t('settings.cableN', { n: i + 1 })}
                       </span>
                       <span className="cable-ep-name">{name}</span>
                     </div>
@@ -230,9 +241,8 @@ export function SettingsDrawer() {
                 </div>
               ) : null}
 
-              {/* Карта шин → кабели */}
               <div className="cable-bus-map">
-                <div className="cable-ep-header">Назначение шин:</div>
+                <div className="cable-ep-header">{t('settings.busMap')}</div>
                 {BUS_ORDER.filter((id) => id.startsWith('B')).map((busId) => {
                   const bus = buses[busId]
                   const hasDevice = bus.deviceId && bus.deviceId.length > 0
@@ -248,15 +258,15 @@ export function SettingsDrawer() {
                         </span>
                       ) : idx >= 3 ? (
                         <span className="pill" style={{ height: 16, padding: '0 5px', fontSize: 7.5, opacity: 0.4 }}>
-                          нет кабеля
+                          {t('settings.noCable')}
                         </span>
                       ) : isB2 ? (
                         <span className="pill warn" style={{ height: 16, padding: '0 5px', fontSize: 7.5 }}>
-                          нужен второй кабель
+                          {t('settings.needCable')}
                         </span>
                       ) : (
                         <span className="pill good" style={{ height: 16, padding: '0 5px', fontSize: 7.5 }}>
-                          <i className="dot" />готов
+                          <i className="dot" />{t('settings.ready')}
                         </span>
                       )}
                     </div>
@@ -270,17 +280,13 @@ export function SettingsDrawer() {
                   className="btn primary small"
                   onClick={() => {
                     if (status.driver.installed) {
-                      notify('Виртуальные кабели уже установлены. Для переустановки запустите установщик VAC (vac471.exe) или VBCABLE_Setup_x64.exe от администратора.')
+                      notify(t('settings.installedNotice'))
                     } else {
-                      notify(
-                        '1. Скачайте VBCABLE_Driver_Pack с vb-audio.com\n' +
-                        '2. Запустите VBCABLE_Setup_x64.exe от администратора\n' +
-                        '3. Нажмите «Install Driver» и перезагрузите ПК',
-                      )
+                      notify(t('settings.installSteps'))
                     }
                   }}
                 >
-                  {status.driver.installed ? 'Проверить' : 'Как установить'}
+                  {status.driver.installed ? t('settings.check') : t('settings.howToInstall')}
                 </button>
                 <button
                   type="button"
@@ -290,7 +296,7 @@ export function SettingsDrawer() {
                     useUi.getState().setGuideOpen(true)
                   }}
                 >
-                  Инструкция
+                  {t('settings.guide')}
                 </button>
               </div>
             </div>
@@ -298,46 +304,59 @@ export function SettingsDrawer() {
 
           <section className="settings-group">
             <span className="section-label">
-              <Palette size={12} /> Интерфейс и поведение
+              <Palette size={12} /> {t('settings.interface')}
             </span>
             <div className="setting-row">
-              <span className="s-label">Тема</span>
+              <span className="s-label">{t('settings.theme')}</span>
               <div className="seg theme-switcher">
-                <button type="button" className={theme === 'studio' ? 'on' : ''} onClick={() => setTheme('studio')} title="Матовая приборная панель — текущий дизайн">
+                <button type="button" className={theme === 'studio' ? 'on' : ''} onClick={() => setTheme('studio')} title={t('settings.themeStudioTip')}>
                   Nexus-Studio
                 </button>
-                <button type="button" className={theme === 'dark' ? 'on' : ''} onClick={() => setTheme('dark')} title="Чёрное стекло и фиолетовое свечение">
+                <button type="button" className={theme === 'dark' ? 'on' : ''} onClick={() => setTheme('dark')} title={t('settings.themeDarkTip')}>
                   Nexus-Noir
                 </button>
-                <button type="button" className={theme === 'light' ? 'on' : ''} onClick={() => setTheme('light')} title="Белое стекло и синий акцент">
+                <button type="button" className={theme === 'light' ? 'on' : ''} onClick={() => setTheme('light')} title={t('settings.themeLightTip')}>
                   Nexus-Frost
                 </button>
               </div>
             </div>
+            <div className="setting-row">
+              <span className="s-label">
+                <Languages size={12} /> {t('settings.language')}
+              </span>
+              <div className="seg lang-switcher lang-seg">
+                <button type="button" className={lang === 'ru' ? 'on' : ''} onClick={() => setLang('ru')}>
+                  {t('settings.langRu')}
+                </button>
+                <button type="button" className={lang === 'en' ? 'on' : ''} onClick={() => setLang('en')}>
+                  {t('settings.langEn')}
+                </button>
+              </div>
+            </div>
             <div className="toggle-row">
-              <span className="t-label">Следовать за устройствами Windows по умолчанию</span>
+              <span className="t-label">{t('settings.followDefault')}</span>
               <Switch
                 on={engine.followDefaultDevices}
                 onChange={(value) => setEngine({ followDefaultDevices: value })}
-                ariaLabel="Следовать за устройствами по умолчанию"
+                ariaLabel={t('settings.followDefaultAria')}
               />
             </div>
             <div className="toggle-row">
-              <span className="t-label">Работать в трее при закрытии окна</span>
+              <span className="t-label">{t('settings.tray')}</span>
               <Switch
                 on={engine.runInTray}
                 onChange={(value) => setEngine({ runInTray: value })}
-                ariaLabel="Работать в трее"
+                ariaLabel={t('settings.trayAria')}
               />
             </div>
             <div className="toggle-row">
               <span className="t-label">
-                Запускать вместе с Windows <span className="s-hint">· скоро</span>
+                {t('settings.autostart')} <span className="s-hint">{t('settings.soon')}</span>
               </span>
               <Switch
                 on={engine.startWithWindows}
                 onChange={(value) => setEngine({ startWithWindows: value })}
-                ariaLabel="Автозапуск"
+                ariaLabel={t('settings.autostartAria')}
                 disabled
               />
             </div>
@@ -345,38 +364,35 @@ export function SettingsDrawer() {
 
           <section className="settings-group">
             <span className="section-label">
-              <RefreshCw size={12} /> Обновления
+              <RefreshCw size={12} /> {t('settings.updates')}
             </span>
             <UpdateSettings />
           </section>
 
           <section className="settings-group">
             <span className="section-label">
-              <Info size={12} /> О приложении
+              <Info size={12} /> {t('settings.about')}
             </span>
             <div className="about-card">
               <div className="about-title">
                 Nexus-<b>Mixer</b>
               </div>
-              <p>
-                Виртуальный аудиомикшер с DSP-цепочками и локальной ИИ-конверсией голоса. Полный аналог Voicemeeter
-                Banana с современным интерфейсом.
-              </p>
+              <p>{t('settings.aboutText')}</p>
               <div className="about-meta">
-                <span>Nexus × АутSquad</span>
+                <span>{t('brand.sign')}</span>
                 <span>0.4.0 · Tauri 2 · Rust</span>
               </div>
               <button
                 type="button"
                 className="btn danger small"
                 onClick={() => {
-                  if (window.confirm('Сбросить все каналы, пресеты и макросы к заводским настройкам?')) {
+                  if (window.confirm(t('settings.resetConfirm'))) {
                     resetAll()
-                    notify('Настройки сброшены')
+                    notify(t('settings.resetDone'))
                   }
                 }}
               >
-                Сбросить всё
+                {t('settings.resetAll')}
               </button>
             </div>
           </section>

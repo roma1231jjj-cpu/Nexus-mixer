@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { publishMeterLevels } from '../audio/meterBus'
 import { BUS_ORDER, STRIP_ORDER } from '../data/defaults'
+import { t } from '../i18n'
 import { useMixer } from '../store/useMixer'
 import { useUi } from '../store/useUi'
 import type { AudioDevice, BusId, StripId } from '../types'
@@ -86,8 +87,8 @@ function normalizeDevices(devices: AudioDevice[]): void {
       continue
     }
 
-    // Virtual strips read the matching numbered cable: Система <- B1,
-    // Игра <- B2. This is a one-time migration, not a permanent override.
+    // Virtual strips read the matching numbered cable: System <- B1,
+    // Game <- B2. This is a one-time migration, not a permanent override.
     const virtualSlot = remapCables ? (id === 'vaio' ? 1 : id === 'aux' ? 2 : null) : null
     if (virtualSlot !== null) {
       const expected = virtualInputs.find((device) => cableIndex(device.name) === virtualSlot)
@@ -284,11 +285,11 @@ export function useEngineBridge(): void {
       if (!force && now - lastRestartAt < 15_000) return
       lastRestartAt = now
       restarting = true
-      useUi.getState().notify(`Перезапуск аудиодвижка: ${reason}`)
+      useUi.getState().notify(t('engine.restart', { reason }))
       void restartEngine().then((result) => {
         restarting = false
         if (!result.ok) {
-          useUi.getState().notify(result.error ?? 'Не удалось восстановить аудиодвижок')
+          useUi.getState().notify(result.error ?? t('engine.restartFailed'))
         }
       })
     }
@@ -339,7 +340,7 @@ export function useEngineBridge(): void {
         }
 
         if (lost.length > 0 && devices.length > 0) {
-          maybeRestart('потеряно устройство')
+          maybeRestart(t('engine.reasonLost'))
         }
       })
     }
@@ -353,7 +354,7 @@ export function useEngineBridge(): void {
     const scheduleDeviceRestart = () => {
       window.clearTimeout(deviceRestartTimer)
       deviceRestartTimer = window.setTimeout(() => {
-        maybeRestart('изменено устройство', true)
+        maybeRestart(t('engine.reasonChanged'), true)
       }, 450)
     }
 
@@ -415,7 +416,7 @@ export function useEngineBridge(): void {
             stalledPolls += 1
             if (stalledPolls >= 3) {
               stalledPolls = 0
-              maybeRestart('аудиопоток остановился')
+              maybeRestart(t('engine.reasonStopped'))
             }
           } else {
             stalledPolls = 0

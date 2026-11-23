@@ -6,8 +6,10 @@ import { Switch } from '../controls/Switch'
 import { EqEditor } from '../controls/EqEditor'
 import { EqBands } from './EqBands'
 import { Select } from '../controls/Select'
+import { useT } from '../../i18n'
 
 export function BusFx({ bus }: { bus: Bus }) {
+  const t = useT()
   const setBus = useMixer((s) => s.setBus)
   const setBusFx = useMixer((s) => s.setBusFx)
   const setBusEqBand = useMixer((s) => s.setBusEqBand)
@@ -24,7 +26,7 @@ export function BusFx({ bus }: { bus: Bus }) {
             <SlidersHorizontal size={13} />
           </span>
           <span className="fx-title">Output</span>
-          <span className="fx-sub">{bus.kind === 'virtual' ? 'virtual bus' : 'physical out'}</span>
+          <span className="fx-sub">{bus.kind === 'virtual' ? t('busfx.virtual') : t('busfx.physical')}</span>
         </header>
         <div className="fx-block-body">
           <div className="knob-row">
@@ -84,11 +86,11 @@ export function BusFx({ bus }: { bus: Bus }) {
             </button>
           </div>
           <div className="field" style={{ marginTop: 10 }}>
-            <label htmlFor={`bus-device-${bus.id}`}>Устройство вывода</label>
+            <label htmlFor={`bus-device-${bus.id}`}>{t('busfx.outputDevice')}</label>
             <Select
               value={bus.deviceId}
               options={[
-                { value: '', label: '— не назначено —' },
+                { value: '', label: t('fx.notAssigned') },
                 ...devices
                   .filter((device) => device.kind === 'output' || device.kind === 'virtual-playback')
                   .map((device) => ({ value: device.id, label: device.name })),
@@ -105,11 +107,11 @@ export function BusFx({ bus }: { bus: Bus }) {
             <Shield size={13} />
           </span>
           <span className="fx-title">Limiter</span>
-          <span className="fx-sub">{limiter.enabled ? `${limiter.ceiling.toFixed(1)} dBFS` : 'bypass'}</span>
+          <span className="fx-sub">{limiter.enabled ? `${limiter.ceiling.toFixed(1)} dBFS` : t('fx.bypass')}</span>
           <Switch
             on={limiter.enabled}
             onChange={(value) => setBusFx(bus.id, { limiter: { ...limiter, enabled: value } })}
-            ariaLabel="Включить лимитер"
+            ariaLabel={t('busfx.limiterSwitch')}
           />
         </header>
         <div className="fx-block-body">
@@ -148,11 +150,11 @@ export function BusFx({ bus }: { bus: Bus }) {
             <AudioWaveform size={13} />
           </span>
           <span className="fx-title">Bus EQ</span>
-          <span className="fx-sub">{eq.filter((band) => band.enabled).length}/10 bands</span>
+          <span className="fx-sub">{t('fx.bands', { on: eq.filter((band) => band.enabled).length, total: 10 })}</span>
           <Switch
             on={eqAny}
             onChange={(value) => setBusFx(bus.id, { eq: eq.map((band) => ({ ...band, enabled: value })) })}
-            ariaLabel="Включить эквалайзер шины"
+            ariaLabel={t('busfx.eqSwitch')}
           />
         </header>
         <div className="fx-block-body">
@@ -176,9 +178,10 @@ export function BusFx({ bus }: { bus: Bus }) {
       </section>
 
       <div className="fx-note">
-        Шина {bus.id} · {bus.kind === 'virtual' ? 'уходит в виртуальный кабель Nexus' : 'физический выход'}
-        {bus.fx.delayMs > 0 ? ` · задержка ${bus.fx.delayMs.toFixed(1)} мс` : ''}
-        {bus.dim ? ' · DIM активен' : ''}
+        {t('bus.aria', { name: bus.id })} ·{' '}
+        {bus.kind === 'virtual' ? t('busfx.noteVirtual') : t('busfx.notePhysical')}
+        {bus.fx.delayMs > 0 ? t('busfx.noteDelay', { ms: bus.fx.delayMs.toFixed(1) }) : ''}
+        {bus.dim ? t('busfx.noteDim') : ''}
       </div>
     </>
   )

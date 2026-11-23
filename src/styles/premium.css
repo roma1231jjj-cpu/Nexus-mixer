@@ -418,7 +418,7 @@ body {
   box-shadow: 0 6px 18px -8px var(--bad);
 }
 
-/* master mute — большая красная кнопка паники */
+/* master mute — big red panic button */
 .master-mute {
   display: flex;
   align-items: center;

@@ -3,11 +3,13 @@ import { createPortal } from 'react-dom'
 import { useMixer } from '../store/useMixer'
 import { BUS_ORDER } from '../data/defaults'
 import type { BusId, StripId } from '../types'
+import { useT } from '../i18n'
 
 const A_BUSES: BusId[] = BUS_ORDER.filter((bus) => bus.startsWith('A'))
 const B_BUSES: BusId[] = BUS_ORDER.filter((bus) => bus.startsWith('B'))
 
 export function StripRouting({ id }: { id: StripId }) {
+  const t = useT()
   const routing = useMixer((s) => s.strips[id].routing)
   const color = useMixer((s) => s.strips[id].color)
   const buses = useMixer((s) => s.buses)
@@ -77,7 +79,7 @@ export function StripRouting({ id }: { id: StripId }) {
         className={`route-chip route-chip-b${activeB.length > 0 ? ' on' : ''}${open ? ' open' : ''}`}
         aria-pressed={activeB.length > 0}
         aria-expanded={open}
-        data-tip={`Кабельные выходы B1–B12 · включено ${activeB.length}`}
+        data-tip={t('routing.cableTip', { count: activeB.length })}
         onClick={(event) => {
           event.stopPropagation()
           setOpen((value) => !value)
@@ -85,7 +87,7 @@ export function StripRouting({ id }: { id: StripId }) {
       >
         <span className="route-chip-id">B</span>
         <span className="route-chip-name">
-          {activeB.length > 0 ? `${activeB.length} из ${B_BUSES.length}` : 'кабели'}
+          {activeB.length > 0 ? t('routing.count', { on: activeB.length, total: B_BUSES.length }) : t('routing.cableName')}
         </span>
       </button>
 
@@ -103,10 +105,8 @@ export function StripRouting({ id }: { id: StripId }) {
               onClick={(event) => event.stopPropagation()}
             >
               <div className="route-pop-head">
-                <span>Кабельные выходы</span>
-                <span className="route-pop-sub">
-                  {activeB.length} из {B_BUSES.length}
-                </span>
+                <span>{t('routing.head')}</span>
+                <span className="route-pop-sub">{t('routing.count', { on: activeB.length, total: B_BUSES.length })}</span>
               </div>
               <div className="route-pop-grid">
                 {B_BUSES.map((bus) => {
@@ -118,7 +118,7 @@ export function StripRouting({ id }: { id: StripId }) {
                       type="button"
                       className={`route-cell${route.on ? ' on' : ''}${dead ? ' dead' : ''}`}
                       aria-pressed={route.on}
-                      data-tip={dead ? `${bus} · ${buses[bus].name} — кабель не назначен` : `${bus} · ${buses[bus].name}`}
+                      data-tip={dead ? t('routing.dead', { bus, name: buses[bus].name }) : t('bus.hint', { id: bus, name: buses[bus].name })}
                       onClick={(event) => {
                         event.stopPropagation()
                         toggleRoute(id, bus)
@@ -130,7 +130,7 @@ export function StripRouting({ id }: { id: StripId }) {
                   )
                 })}
               </div>
-              <div className="route-pop-foot">Клик — включить или выключить. Уровень посыла — в матрице.</div>
+              <div className="route-pop-foot">{t('routing.foot')}</div>
             </div>,
             document.body,
           )

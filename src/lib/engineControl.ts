@@ -7,6 +7,7 @@
  */
 
 import { publishMeterLevels } from '../audio/meterBus'
+import { t } from '../i18n'
 import { useMixer } from '../store/useMixer'
 import type { AiStatus, EngineStatus, RuntimeInfo } from '../types'
 import { engineBridge, getLastEngineError, snapshotOf } from './engineBridge'
@@ -53,7 +54,7 @@ export async function connectAiSidecar(
   config?: Record<string, unknown>,
 ): Promise<AiActionResult> {
   if (!engineBridge.available) {
-    return { ok: false, error: 'AI-sidecar доступен только в desktop-сборке Tauri' }
+    return { ok: false, error: t('ai.desktopOnly') }
   }
   // The sidecar handshake derives its chunk size from the last mixer snapshot.
   // Publish the current AI settings first so a fresh launch connects with the
@@ -61,7 +62,7 @@ export async function connectAiSidecar(
   await engineBridge.setMixerState(snapshotOf(useMixer.getState()))
   const ai = await engineBridge.connectAi(config)
   if (!ai) {
-    return { ok: false, error: getLastEngineError() ?? 'Не удалось подключиться к sidecar' }
+    return { ok: false, error: getLastEngineError() ?? t('ai.connectError') }
   }
   applyAiStatus(ai)
   return { ok: true, ai }
@@ -69,11 +70,11 @@ export async function connectAiSidecar(
 
 export async function disconnectAiSidecar(): Promise<AiActionResult> {
   if (!engineBridge.available) {
-    return { ok: false, error: 'AI-sidecar доступен только в desktop-сборке Tauri' }
+    return { ok: false, error: t('ai.desktopOnly') }
   }
   const ai = await engineBridge.disconnectAi()
   if (!ai) {
-    return { ok: false, error: getLastEngineError() ?? 'Не удалось отключить sidecar' }
+    return { ok: false, error: getLastEngineError() ?? t('ai.disconnectError') }
   }
   applyAiStatus(ai)
   return { ok: true, ai }
@@ -81,11 +82,11 @@ export async function disconnectAiSidecar(): Promise<AiActionResult> {
 
 export async function pingAiSidecar(): Promise<AiActionResult> {
   if (!engineBridge.available) {
-    return { ok: false, error: 'AI-sidecar доступен только в desktop-сборке Tauri' }
+    return { ok: false, error: t('ai.desktopOnly') }
   }
   const ai = await engineBridge.pingAi()
   if (!ai) {
-    return { ok: false, error: getLastEngineError() ?? 'Sidecar не ответил на ping' }
+    return { ok: false, error: getLastEngineError() ?? t('ai.pingError') }
   }
   applyAiStatus(ai)
   return { ok: true, ai }
@@ -99,7 +100,7 @@ export async function refreshEngineInfo(): Promise<RuntimeInfo | null> {
 
 export async function startEngine(): Promise<EngineActionResult> {
   if (!engineBridge.available) {
-    return { ok: false, error: 'Аудиодвижок доступен только в desktop-сборке Tauri' }
+    return { ok: false, error: t('engine.desktopOnly') }
   }
 
   // Always publish the freshest snapshot first: `start_engine` builds the
@@ -107,7 +108,7 @@ export async function startEngine(): Promise<EngineActionResult> {
   await engineBridge.setMixerState(snapshotOf(useMixer.getState()))
   const status = await engineBridge.start()
   if (!status) {
-    return { ok: false, error: getLastEngineError() ?? 'Не удалось запустить аудиодвижок' }
+    return { ok: false, error: getLastEngineError() ?? t('engine.startFailed') }
   }
 
   applyEngineStatus(status)
@@ -119,12 +120,12 @@ export async function startEngine(): Promise<EngineActionResult> {
 
 export async function stopEngine(): Promise<EngineActionResult> {
   if (!engineBridge.available) {
-    return { ok: false, error: 'Аудиодвижок доступен только в desktop-сборке Tauri' }
+    return { ok: false, error: t('engine.desktopOnly') }
   }
 
   const status = await engineBridge.stop()
   if (!status) {
-    return { ok: false, error: getLastEngineError() ?? 'Не удалось остановить аудиодвижок' }
+    return { ok: false, error: getLastEngineError() ?? t('engine.stopFailed') }
   }
 
   applyEngineStatus(status)
@@ -141,7 +142,7 @@ export async function stopEngine(): Promise<EngineActionResult> {
  */
 export async function restartEngine(): Promise<EngineActionResult> {
   if (!engineBridge.available) {
-    return { ok: false, error: 'Аудиодвижок доступен только в desktop-сборке Tauri' }
+    return { ok: false, error: t('engine.desktopOnly') }
   }
 
   await engineBridge.stop()

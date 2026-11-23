@@ -1,5 +1,7 @@
-import { useRef, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react'
+import {
+  useRef, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react'
 import { clamp } from '../../lib/format'
+import { t } from '../../i18n'
 
 interface KnobProps {
   label: string
@@ -88,7 +90,7 @@ export function Knob({
     <div
       className="knob"
       style={{ '--knob-color': color ?? 'var(--accent)' } as CSSProperties}
-      data-tip={hint ?? title ?? `${label} — тяните вверх/вниз, двойной клик сбрасывает`}
+      data-tip={hint ?? title ?? t('knob.dragReset', { label })}
     >
       <span className="knob-label">{label}</span>
       <div

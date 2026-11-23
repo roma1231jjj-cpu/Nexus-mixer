@@ -23,6 +23,7 @@ import type {
   Theme,
   VcaGroup,
 } from '../types'
+import { t } from '../i18n'
 
 export const STRIP_ORDER: StripId[] = ['hw1', 'hw2', 'hw3', 'vaio', 'aux', 'hw4', 'hw5', 'hw6']
 export const BUS_ORDER: BusId[] = ['A1', 'A2', 'A3', 'B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B9', 'B10', 'B11', 'B12']
@@ -129,12 +130,12 @@ const defaultRouting = (id: StripId): Routing => {
   for (const bus of BUS_ORDER) {
     r[bus] = { on: false, levelDb: 0 }
   }
-  // Настройки по умолчанию для типовых сценариев
-  if (id === 'hw1') r['A1'] = { on: true, levelDb: 0 }        // микрофон → наушники
-  if (id === 'hw2') r['A1'] = { on: true, levelDb: 0 }        // музыка → наушники
-  if (id === 'vaio') r['B1'] = { on: true, levelDb: 0 }        // система → Discord
-  if (id === 'hw3') { r['A1'] = { on: false, levelDb: 0 }; r['B1'] = { on: true, levelDb: 0 } } // браузер → Discord
-  if (id === 'aux') { r['A1'] = { on: true, levelDb: 0 }; r['B1'] = { on: true, levelDb: 0 } }  // игра → везде
+  // Default routes for the common scenarios
+  if (id === 'hw1') r['A1'] = { on: true, levelDb: 0 }        // microphone -> headphones
+  if (id === 'hw2') r['A1'] = { on: true, levelDb: 0 }        // music -> headphones
+  if (id === 'vaio') r['B1'] = { on: true, levelDb: 0 }        // system -> Discord
+  if (id === 'hw3') { r['A1'] = { on: false, levelDb: 0 }; r['B1'] = { on: true, levelDb: 0 } } // browser -> Discord
+  if (id === 'aux') { r['A1'] = { on: true, levelDb: 0 }; r['B1'] = { on: true, levelDb: 0 } }  // game -> everywhere
   return r
 }
 
@@ -161,43 +162,43 @@ const makeStrip = (id: StripId, patch: Partial<Strip>): Strip => ({
 
 export const makeStrips = (): Record<StripId, Strip> => ({
   hw1: makeStrip('hw1', {
-    name: 'Микрофон',
+    name: t('data.strip.mic'),
     deviceId: 'in:mic-usb',
     color: '#c8a15a',
     fx: makeVelvetVoiceFx(),
   }),
   hw2: makeStrip('hw2', {
-    name: 'Музыка',
+    name: t('data.strip.music'),
     deviceId: 'in:line',
     color: '#b98a72',
   }),
   hw3: makeStrip('hw3', {
-    name: 'Браузер',
+    name: t('data.strip.browser'),
     deviceId: '',
     color: '#7f97a8',
   }),
   hw4: makeStrip('hw4', {
-    name: 'Вход 6',
+    name: t('data.strip.in6'),
     deviceId: '',
     color: '#a9b48d',
   }),
   hw5: makeStrip('hw5', {
-    name: 'Вход 7',
+    name: t('data.strip.in7'),
     deviceId: '',
     color: '#b98b73',
   }),
   hw6: makeStrip('hw6', {
-    name: 'Вход 8',
+    name: t('data.strip.in8'),
     deviceId: '',
     color: '#a497b0',
   }),
   vaio: makeStrip('vaio', {
-    name: 'Система',
+    name: t('data.strip.system'),
     deviceId: 'in:vaio-out',
     color: '#8f9a7a',
   }),
   aux: makeStrip('aux', {
-    name: 'Игра',
+    name: t('data.strip.game'),
     deviceId: 'in:aux-out',
     color: '#a98fa0',
   }),
@@ -219,27 +220,27 @@ const makeBus = (id: BusId, patch: Partial<Bus>): Bus => ({
 
 export const makeBuses = (): Record<BusId, Bus> => {
   const busDefs: Partial<Record<BusId, Partial<Bus>>> = {
-    A1: { name: 'Наушники', deviceId: 'out:speakers', color: '#c8a15a' },
-    A2: { name: 'Наушники 2', deviceId: '', color: '#8f9a7a' },
-    A3: { name: 'Колонки', deviceId: '', color: '#7f97a8' },
-    B1: { name: 'Discord | Стрим', deviceId: 'out:vaio', color: '#b98a72', fx: makeBusFx({ width: 100 }) },
-    B2: { name: 'Кабель 2', deviceId: 'out:aux', color: '#7f97a8' },
-    B3: { name: 'Кабель 3', color: '#8f9a7a' },
-    B4: { name: 'Кабель 4', color: '#a98fa0' },
-    B5: { name: 'Кабель 5', color: '#c8a15a' },
-    B6: { name: 'Кабель 6', color: '#b98a72' },
-    B7: { name: 'Кабель 7', color: '#7f97a8' },
-    B8: { name: 'Кабель 8', color: '#8f9a7a' },
-    B9: { name: 'Кабель 9', color: '#a98fa0' },
-    B10: { name: 'Кабель 10', color: '#c8a15a' },
-    B11: { name: 'Кабель 11', color: '#b98a72' },
-    B12: { name: 'Кабель 12', color: '#7f97a8' },
+    A1: { name: t('data.bus.hp1'), deviceId: 'out:speakers', color: '#c8a15a' },
+    A2: { name: t('data.bus.hp2'), deviceId: '', color: '#8f9a7a' },
+    A3: { name: t('data.bus.speakers'), deviceId: '', color: '#7f97a8' },
+    B1: { name: t('data.bus.stream'), deviceId: 'out:vaio', color: '#b98a72', fx: makeBusFx({ width: 100 }) },
+    B2: { name: t('data.bus.cable2'), deviceId: 'out:aux', color: '#7f97a8' },
+    B3: { name: t('data.bus.cable3'), color: '#8f9a7a' },
+    B4: { name: t('data.bus.cable4'), color: '#a98fa0' },
+    B5: { name: t('data.bus.cable5'), color: '#c8a15a' },
+    B6: { name: t('data.bus.cable6'), color: '#b98a72' },
+    B7: { name: t('data.bus.cable7'), color: '#7f97a8' },
+    B8: { name: t('data.bus.cable8'), color: '#8f9a7a' },
+    B9: { name: t('data.bus.cable9'), color: '#a98fa0' },
+    B10: { name: t('data.bus.cable10'), color: '#c8a15a' },
+    B11: { name: t('data.bus.cable11'), color: '#b98a72' },
+    B12: { name: t('data.bus.cable12'), color: '#7f97a8' },
   }
   const result = {} as Record<BusId, Bus>
   for (const id of BUS_ORDER) {
     const patch = busDefs[id] ?? {}
     const bus = makeBus(id, patch)
-    // B3+ без deviceId — не активны, пока не появится кабель
+    // B3+ without a deviceId stays inactive until a cable appears
     bus.deviceId = id.startsWith('B') && parseInt(id.slice(1)) >= 3 ? '' : patch.deviceId ?? ''
     result[id] = bus
   }
@@ -373,7 +374,7 @@ export const makeAiModels = (): AiVoiceModel[] => [
   {
     id: 'rvc-aria',
     name: 'Aria — Bright Female',
-    author: 'АутSquad Labs',
+    author: t('data.author.labs'),
     language: 'RU / EN',
     sampleRate: 40000,
     sizeMb: 184,
@@ -384,7 +385,7 @@ export const makeAiModels = (): AiVoiceModel[] => [
   {
     id: 'rvc-narrator',
     name: 'Narrator — Deep Male',
-    author: 'АутSquad Labs',
+    author: t('data.author.labs'),
     language: 'RU / EN',
     sampleRate: 40000,
     sizeMb: 196,
@@ -421,7 +422,7 @@ export const makePresets = (): Preset[] => [
     id: 'flat',
     name: 'Flat / Neutral',
     category: 'voice',
-    description: 'Чистый тракт без обработки. Точка отсчёта.',
+    description: t('data.preset.flat.desc'),
     fx: {
       gate: makeGate(),
       compressor: makeCompressor(),
@@ -433,9 +434,9 @@ export const makePresets = (): Preset[] => [
   },
   {
     id: 'velvet',
-    name: 'Бархат · студия',
+    name: t('data.preset.velvet.name'),
     category: 'voice',
-    description: 'Мягкий тёплый голос для бюджетного конденсатора: меньше бубна и шипящих, плотная динамика.',
+    description: t('data.preset.velvet.desc'),
     fx: makeVelvetVoiceFx(),
     builtin: true,
   },
@@ -443,7 +444,7 @@ export const makePresets = (): Preset[] => [
     id: 'streamer',
     name: 'Streamer',
     category: 'voice',
-    description: 'Плотный голос для стрима: гейт, компрессор и подъём разборчивости.',
+    description: t('data.preset.streamer.desc'),
     fx: {
       gate: makeGate({ enabled: true, threshold: -50, range: -65 }),
       compressor: makeCompressor({ enabled: true, threshold: -22, ratio: 4, attack: 6, release: 140, makeup: 5 }),
@@ -465,7 +466,7 @@ export const makePresets = (): Preset[] => [
     id: 'podcast',
     name: 'Podcast',
     category: 'broadcast',
-    description: 'Тёплый низ, ровная динамика, мягкая де-эссинг.',
+    description: t('data.preset.podcast.desc'),
     fx: {
       gate: makeGate({ enabled: true, threshold: -55, attack: 10, release: 280, range: -60 }),
       compressor: makeCompressor({ enabled: true, threshold: -24, ratio: 3, attack: 20, release: 240, makeup: 6, knee: 10 }),
@@ -486,7 +487,7 @@ export const makePresets = (): Preset[] => [
     id: 'broadcast',
     name: 'Broadcast FM',
     category: 'broadcast',
-    description: 'Максимальная плотность и громкость, как в эфире.',
+    description: t('data.preset.broadcast.desc'),
     fx: {
       gate: makeGate({ enabled: true, threshold: -46, range: -70 }),
       compressor: makeCompressor({ enabled: true, threshold: -30, ratio: 8, attack: 3, release: 90, makeup: 9, knee: 2 }),
@@ -506,7 +507,7 @@ export const makePresets = (): Preset[] => [
     id: 'whisper',
     name: 'Whisper / ASMR',
     category: 'voice',
-    description: 'Высокий гейн, мягкая компрессия, минимум шума.',
+    description: t('data.preset.whisper.desc'),
     fx: {
       gate: makeGate({ enabled: true, threshold: -62, attack: 25, release: 400, range: -55 }),
       compressor: makeCompressor({ enabled: true, threshold: -40, ratio: 5, attack: 30, release: 400, makeup: 14, knee: 12 }),
@@ -520,7 +521,7 @@ export const makePresets = (): Preset[] => [
     id: 'phone',
     name: 'Phone / Lo-Fi',
     category: 'fx',
-    description: 'Телефонная полоса 300–3400 Гц с лёгким драйвом.',
+    description: t('data.preset.phone.desc'),
     fx: {
       gate: makeGate({ enabled: true, threshold: -50 }),
       compressor: makeCompressor({ enabled: true, threshold: -26, ratio: 6, attack: 5, release: 120, makeup: 8 }),
@@ -540,7 +541,7 @@ export const makePresets = (): Preset[] => [
     id: 'robot',
     name: 'Robot / FX',
     category: 'fx',
-    description: 'Агрессивная сатурация и металлический тембр.',
+    description: t('data.preset.robot.desc'),
     fx: {
       gate: makeGate({ enabled: true, threshold: -55 }),
       compressor: makeCompressor({ enabled: true, threshold: -28, ratio: 10, attack: 2, release: 60, makeup: 10 }),
@@ -554,7 +555,7 @@ export const makePresets = (): Preset[] => [
     id: 'ai-aria',
     name: 'AI · Aria',
     category: 'ai',
-    description: 'DSP-подготовка + конверсия в голос Aria.',
+    description: t('data.preset.aiaria.desc'),
     fx: {
       gate: makeGate({ enabled: true, threshold: -52 }),
       compressor: makeCompressor({ enabled: true, threshold: -24, ratio: 4, makeup: 5 }),
@@ -569,7 +570,7 @@ export const makePresets = (): Preset[] => [
     id: 'ai-narrator',
     name: 'AI · Narrator',
     category: 'ai',
-    description: 'Глубокий мужской тембр для подкастов и озвучки.',
+    description: t('data.preset.ainarrator.desc'),
     fx: {
       gate: makeGate({ enabled: true, threshold: -55 }),
       compressor: makeCompressor({ enabled: true, threshold: -26, ratio: 3, makeup: 6 }),
@@ -633,7 +634,7 @@ export const initialEngineStatus: EngineStatus = {
     testMode: false,
     endpoints: 0,
     cableEndpoints: [],
-    message: 'Виртуальный кабель не найден — виртуальные шины работают в режиме эмуляции.',
+    message: t('data.engine.noCable'),
   },
   aiStatus: 'offline',
   aiBackend: 'Nexus AI sidecar',
@@ -645,7 +646,7 @@ export const initialEngineStatus: EngineStatus = {
     chunkFrames: 7680,
     rtf: 1,
     endpoint: '127.0.0.1:47600',
-    message: 'Sidecar не подключён — запустите python tools/ai-sidecar/sidecar.py',
+    message: t('data.engine.sidecarOffline'),
     roundtripMs: null,
   },
 }

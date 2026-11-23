@@ -7,6 +7,7 @@ import {
   LayoutGrid,
   Moon,
   Music,
+  Languages,
   RotateCcw,
   RotateCw,
   Save,
@@ -20,14 +21,15 @@ import { useMixer } from '../store/useMixer'
 import { useUi } from '../store/useUi'
 import { Select } from './controls/Select'
 import { useUndoRedoIntegration } from '../lib/useUndoRedoIntegration'
+import { useT, useLang, useLocale, type TKey } from '../i18n'
 
-const CATEGORY_LABEL: Record<string, string> = {
-  voice: 'Голос',
-  broadcast: 'Бродкаст',
-  fx: 'Эффекты',
-  ai: 'ИИ-пресеты',
-  music: 'Музыка',
-  custom: 'Мои пресеты',
+const CATEGORY_LABEL: Record<string, TKey> = {
+  voice: 'toolbar.category.voice',
+  broadcast: 'toolbar.category.broadcast',
+  fx: 'toolbar.category.fx',
+  ai: 'toolbar.category.ai',
+  music: 'toolbar.category.music',
+  custom: 'toolbar.category.custom',
 }
 
 const RACK_TABS = [
@@ -35,41 +37,45 @@ const RACK_TABS = [
     id: 'fx',
     label: 'FX',
     icon: SlidersHorizontal,
-    tip: 'Эффекты выбранного канала или шины',
+    tip: 'toolbar.tip.fx',
   },
   {
     id: 'ai',
     label: 'Voice',
     icon: Sparkles,
-    tip: 'ИИ-конверсия голоса — открыть панель Voice',
+    tip: 'toolbar.tip.ai',
   },
   {
     id: 'macros',
     label: 'Macros',
     icon: Command,
-    tip: 'Макро-кнопки и сцены',
+    tip: 'toolbar.tip.macros',
   },
   {
     id: 'record',
     label: 'Rec',
     icon: Disc3,
-    tip: 'Запись выбранных шин в WAV',
+    tip: 'toolbar.tip.record',
   },
   {
     id: 'sound',
     label: 'Pads',
     icon: Music,
-    tip: 'Pads — звуковые эффекты и вставки',
+    tip: 'toolbar.tip.sound',
   },
   {
     id: 'groups',
     label: 'Groups',
     icon: Layers,
-    tip: 'VCA-группы — один фейдер на несколько каналов',
+    tip: 'toolbar.tip.groups',
   },
-] as const
+] as const satisfies ReadonlyArray<{ id: string; label: string; icon: unknown; tip: TKey }>
 
 export function Toolbar() {
+  const t = useT()
+  const locale = useLocale()
+  const lang = useLang((s) => s.lang)
+  const toggleLang = useLang((s) => s.toggleLang)
   const presets = useMixer((s) => s.presets)
   const applyPreset = useMixer((s) => s.applyPreset)
   const savePreset = useMixer((s) => s.savePreset)
@@ -107,12 +113,16 @@ export function Toolbar() {
   return (
     <div className="toolbar">
       <div className="preset-select">
-        <span className="label">Пресет</span>
+        <span className="label">{t('toolbar.preset')}</span>
         <Select
           value={presetId}
           options={[
             ...Object.entries(grouped).flatMap(([category, items]) => [
-              { value: `__cat__${category}`, label: `— ${CATEGORY_LABEL[category] ?? category} —`, disabled: true },
+              {
+                value: `__cat__${category}`,
+                label: `— ${CATEGORY_LABEL[category] ? t(CATEGORY_LABEL[category]) : category} —`,
+                disabled: true,
+              },
               ...items.map((preset) => ({ value: preset.id, label: preset.name })),
             ]),
           ]}
@@ -121,21 +131,21 @@ export function Toolbar() {
             setPresetId(val)
             applyPreset(val)
             const preset = presets.find((p) => p.id === val)
-            notify(`Пресет «${preset?.name ?? ''}» применён к ${strip.name}`)
+            notify(t('toolbar.presetApplied', { preset: preset?.name ?? '', strip: strip.name }))
           }}
-          placeholder="Выбрать пресет…"
+          placeholder={t('toolbar.choosePreset')}
         />
       </div>
 
       <button
         type="button"
         className="icon-btn"
-        data-tip="Сохранить текущую цепочку как пресет (Ctrl+S)"
+        data-tip={t('toolbar.savePresetTip')}
         data-tip-pos="bottom"
-        aria-label="Сохранить пресет"
+        aria-label={t('toolbar.savePreset')}
         onClick={() => {
-          savePreset(`${strip.name} · ${new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`)
-          notify('Пресет сохранён в «Мои пресеты»')
+          savePreset(`${strip.name} · ${new Date().toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}`)
+          notify(t('app.presetSaved'))
         }}
       >
         <Save size={15} />
@@ -145,7 +155,7 @@ export function Toolbar() {
 
       <div className="toolbar-group rack-tabs">
         {RACK_TABS.map((item) => {
-          const Icon = item.icon
+          const Icon = item.icon as typeof SlidersHorizontal
           const active = rackOpen && rackTab === item.id
           return (
             <button
@@ -153,7 +163,7 @@ export function Toolbar() {
               type="button"
               className={`tool-btn${active ? ' on' : ''}${item.id === 'record' && recorder.enabled ? ' recording' : ''}`}
               onClick={() => openTab(item.id)}
-              data-tip={item.tip}
+              data-tip={t(item.tip)}
               data-tip-pos="bottom"
               aria-label={item.label}
               aria-pressed={active}
@@ -172,11 +182,11 @@ export function Toolbar() {
         type="button"
         className={`tool-btn${matrixOpen ? ' on' : ''}`}
         onClick={() => setMatrixOpen(!matrixOpen)}
-        data-tip="Матрица маршрутизации: какой канал куда идёт (C)"
+        data-tip={t('toolbar.matrixTip')}
         data-tip-pos="bottom"
       >
         <LayoutGrid size={14} />
-        <span className="btn-label">Матрица</span>
+        <span className="btn-label">{t('toolbar.matrix')}</span>
       </button>
 
       <div className="toolbar-spacer" />
@@ -187,8 +197,8 @@ export function Toolbar() {
           className="icon-btn"
           disabled={!undoRedo.canUndo}
           onClick={undoRedo.handleUndo}
-          aria-label="Отменить"
-          data-tip="Отменить изменение FX (Ctrl+Z)"
+          aria-label={t('toolbar.undo')}
+          data-tip={t('toolbar.undoTip')}
           data-tip-pos="bottom"
         >
           <RotateCcw size={15} />
@@ -198,8 +208,8 @@ export function Toolbar() {
           className="icon-btn"
           disabled={!undoRedo.canRedo}
           onClick={undoRedo.handleRedo}
-          aria-label="Повторить"
-          data-tip="Повторить изменение FX (Ctrl+Shift+Z)"
+          aria-label={t('toolbar.redo')}
+          data-tip={t('toolbar.redoTip')}
           data-tip-pos="bottom"
         >
           <RotateCw size={15} />
@@ -210,9 +220,21 @@ export function Toolbar() {
 
       <button
         type="button"
+        className="lang-btn"
+        aria-label={t('toolbar.langAria')}
+        data-tip={t('toolbar.lang', { lang: lang.toUpperCase() })}
+        data-tip-pos="bottom"
+        onClick={toggleLang}
+      >
+        <Languages size={15} />
+        <span>{lang.toUpperCase()}</span>
+      </button>
+
+      <button
+        type="button"
         className="icon-btn"
-        aria-label="Инструкция"
-        data-tip="Инструкция — как всё устроено (F1)"
+        aria-label={t('toolbar.guide')}
+        data-tip={t('toolbar.guideTip')}
         data-tip-pos="bottom"
         onClick={() => useUi.getState().setGuideOpen(true)}
       >
@@ -221,8 +243,8 @@ export function Toolbar() {
       <button
         type="button"
         className="icon-btn"
-        aria-label="Настройки"
-        data-tip="Настройки: аудио, тема, виртуальные кабели"
+        aria-label={t('toolbar.settings')}
+        data-tip={t('toolbar.settingsTip')}
         data-tip-pos="bottom"
         onClick={() => setSettingsOpen(true)}
       >
@@ -231,8 +253,10 @@ export function Toolbar() {
       <button
         type="button"
         className="icon-btn"
-        aria-label="Сменить тему"
-        data-tip={`Тема: ${theme === 'studio' ? 'Nexus-Studio' : theme === 'dark' ? 'Nexus-Noir' : 'Nexus-Frost'} · нажмите, чтобы сменить`}
+        aria-label={t('toolbar.theme')}
+        data-tip={t('toolbar.themeTip', {
+          theme: theme === 'studio' ? t('theme.studio') : theme === 'dark' ? t('theme.dark') : t('theme.light'),
+        })}
         data-tip-pos="bottom"
         onClick={toggleTheme}
       >

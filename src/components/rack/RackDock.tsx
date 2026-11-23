@@ -11,17 +11,19 @@ import { ScenePanel } from './ScenePanel'
 import { SoundPlayer } from './SoundPlayer'
 import { MidiLearnPanel } from '../MidiLearnPanel'
 import { VcaPanel } from './VcaPanel'
+import { useT, type TKey } from '../../i18n'
 
-const TITLES: Record<string, string> = {
-  fx: 'Канал',
-  ai: 'Nexus Voice AI',
-  macros: 'Макросы и сцены',
-  record: 'Запись',
-  sound: 'Пэды',
-  groups: 'Группы VCA',
+const TITLES: Record<string, TKey> = {
+  fx: 'rack.title.fx',
+  ai: 'rack.title.ai',
+  macros: 'rack.title.macros',
+  record: 'rack.title.record',
+  sound: 'rack.title.sound',
+  groups: 'rack.title.groups',
 }
 
 export function RackDock({ onClose }: { onClose: () => void }) {
+  const t = useT()
   const tab = useMixer((s) => s.rackTab)
   const selectionKind = useMixer((s) => s.selectionKind)
   const strip = useMixer((s) => s.strips[s.selectedStripId])
@@ -31,19 +33,19 @@ export function RackDock({ onClose }: { onClose: () => void }) {
   const title =
     tab === 'fx'
       ? selectionKind === 'strip'
-        ? 'Канал'
-        : 'Выход'
-      : TITLES[tab] ?? 'Рэк'
+        ? t('rack.title.fx')
+        : t('rack.title.out')
+      : t(TITLES[tab] ?? 'rack.title.rack')
   const sub =
     tab === 'fx'
       ? selectionKind === 'strip'
-        ? `${strip.name} · канал`
-        : `${bus.id} · ${bus.name}`
+        ? t('rack.sub.strip', { name: strip.name })
+        : t('bus.hint', { id: bus.id, name: bus.name })
       : tab === 'ai'
-        ? 'локально · приватно'
+        ? t('rack.sub.ai')
         : tab === 'record'
-          ? 'WAV после фейдера'
-          : 'сессия'
+          ? t('rack.sub.record')
+          : t('rack.sub.session')
 
   let content: ReactNode
   switch (tab) {
@@ -90,7 +92,7 @@ export function RackDock({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <aside className="rack-dock" aria-label="Панель обработки">
+    <aside className="rack-dock" aria-label={t('rack.panelAria')}>
       <div className="rack-content">
         <header className="rack-header">
           <div className="rack-header-titles">
@@ -102,8 +104,8 @@ export function RackDock({ onClose }: { onClose: () => void }) {
             type="button"
             className="icon-btn rack-close"
             onClick={onClose}
-            aria-label="Закрыть панель"
-            data-tip="Закрыть панель (Esc)"
+            aria-label={t('app.closePanel')}
+            data-tip={t('rack.closeTip')}
           >
             <X size={16} />
           </button>

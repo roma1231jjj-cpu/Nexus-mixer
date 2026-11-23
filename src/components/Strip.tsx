@@ -9,6 +9,7 @@ import type { StripId } from '../types'
 import { StereoMeter } from './controls/StereoMeter'
 import { DeviceSelect } from './controls/DeviceSelect'
 import { StripRouting } from './StripRouting'
+import { useT } from '../i18n'
 
 const ICONS: Record<StripId, typeof Mic> = {
   hw1: Mic,
@@ -26,6 +27,7 @@ const SCALE = [12, 0, -12, -24, -36, -48, -60]
 const scalePos = (value: number) => ((FADER_MAX - value) / (FADER_MAX - FADER_MIN)) * 100
 
 export function Strip({ id }: { id: StripId }) {
+  const t = useT()
   const strip = useMixer((s) => s.strips[id])
   const selected = useMixer((s) => s.selectionKind === 'strip' && s.selectedStripId === id)
   const multiSelected = useMixer((s) => s.multiSelectedStripIds.includes(id))
@@ -86,20 +88,20 @@ export function Strip({ id }: { id: StripId }) {
       className={`strip${selected ? ' selected' : ''}${multiSelected ? ' multi-selected' : ''}`}
       style={{ '--strip-color': strip.color } as React.CSSProperties}
       onClick={handleStripClick}
-      aria-label={`Канал ${strip.name}`}
+      aria-label={t('strip.aria', { name: strip.name })}
       aria-selected={selected}
     >
       <header className="strip-head">
         <Icon size={13} className="strip-icon" strokeWidth={1.8} />
         {nameLocked ? (
-          <span className="strip-name static" data-tip="Имя входа микрофона закреплено">
+          <span className="strip-name static" data-tip={t('strip.nameLockedTip')}>
             {strip.name}
           </span>
         ) : (
           <input
             className="strip-name"
             value={strip.name}
-            aria-label="Название"
+            aria-label={t('strip.nameAria')}
             spellCheck={false}
             maxLength={24}
             onChange={(event) => setStrip(id, { name: event.target.value })}
@@ -112,7 +114,7 @@ export function Strip({ id }: { id: StripId }) {
                 cancelNameEdit.current = false
                 return
               }
-              setStrip(id, { name: event.target.value.trim() || 'Канал' })
+              setStrip(id, { name: event.target.value.trim() || t('strip.defaultName') })
             }}
             onKeyDown={(event) => {
               if (event.key === 'Enter') event.currentTarget.blur()
@@ -125,7 +127,7 @@ export function Strip({ id }: { id: StripId }) {
             }}
           />
         )}
-        <span className="strip-level" data-tip="Усиление канала">{dbLabel(strip.gainDb)}</span>
+        <span className="strip-level" data-tip={t('strip.gainTip')}>{dbLabel(strip.gainDb)}</span>
       </header>
 
       <div className="strip-body">
@@ -141,7 +143,7 @@ export function Strip({ id }: { id: StripId }) {
           </div>
           <div className="strip-track">
             <input type="range" className="strip-slider" min={FADER_MIN} max={FADER_MAX} step={0.5}
-              value={strip.gainDb} data-tip={`Громкость: ${dbLabel(strip.gainDb)} · колесо мыши тоже работает`}
+              value={strip.gainDb} data-tip={t('strip.volumeTip', { level: dbLabel(strip.gainDb) })}
               onChange={(e) => setStrip(id, { gainDb: parseFloat(e.target.value) })}
               onWheel={(e) => {
                 e.preventDefault()
@@ -157,10 +159,10 @@ export function Strip({ id }: { id: StripId }) {
       </div>
 
       <div className="strip-foot">
-        <div className="strip-pan" data-tip={`Панорама: ${panLabel(strip.pan)} · двойной клик сбрасывает`}>
+        <div className="strip-pan" data-tip={t('strip.panTip', { value: panLabel(strip.pan) })}>
           <span className="strip-pan-caption">PAN</span>
           <input type="range" className="pan-slider" min={-1} max={1} step={0.01}
-            value={strip.pan} aria-label="Панорама"
+            value={strip.pan} aria-label={t('strip.panAria')}
             onChange={(e) => setStrip(id, { pan: parseFloat(e.target.value) })}
             onDoubleClick={() => setStrip(id, { pan: 0 })} />
           <span className={`strip-pan-value${strip.pan < -0.005 ? ' L' : strip.pan > 0.005 ? ' R' : ' C'}`}>
@@ -168,7 +170,7 @@ export function Strip({ id }: { id: StripId }) {
           </span>
         </div>
 
-        <div className="strip-fx-flags" data-tip={chain.length ? `Обработка: ${chain.join(', ')}` : 'Без обработки'}>
+        <div className="strip-fx-flags" data-tip={chain.length ? t('strip.chainTip', { chain: chain.join(', ') }) : t('strip.noChain')}>
           {chain.length > 0 ? <span>FX {chain.length}</span> : null}
         </div>
       </div>
@@ -179,23 +181,23 @@ export function Strip({ id }: { id: StripId }) {
           devices={devices}
           kinds={['input', 'virtual-capture']}
           onChange={(deviceId) => setStrip(id, { deviceId })}
-          ariaLabel={`Устройство входа ${strip.name}`}
-          emptyLabel="Вход не назначен"
+          ariaLabel={t('strip.inputDevice', { name: strip.name })}
+          emptyLabel={t('strip.noInput')}
           tone="input"
         />
       </div>
 
       <div className="strip-actions">
         <button type="button" className={`mini-toggle mute${strip.mute ? ' on' : ''}`}
-          aria-pressed={strip.mute} data-tip="Выключить канал"
+          aria-pressed={strip.mute} data-tip={t('strip.muteTip')}
           onClick={(e) => { e.stopPropagation(); setStrip(id, { mute: !strip.mute }) }}>M</button>
         <button type="button" className={`mini-toggle solo${strip.solo ? ' on' : ''}`}
-          aria-pressed={strip.solo} data-tip="Solo — слышно только это"
+          aria-pressed={strip.solo} data-tip={t('strip.soloTip')}
           onClick={(e) => { e.stopPropagation(); setStrip(id, { solo: !strip.solo }) }}>S</button>
         <button type="button" className={`mini-toggle${strip.mono ? ' on' : ''}`}
-          aria-pressed={strip.mono} data-tip="Моно — объединить каналы"
+          aria-pressed={strip.mono} data-tip={t('strip.monoTip')}
           onClick={(e) => { e.stopPropagation(); setStrip(id, { mono: !strip.mono }) }}>MONO</button>
-        <button type="button" className="mini-toggle" data-tip="Настройка звука (FX)"
+        <button type="button" className="mini-toggle" data-tip={t('strip.fxTip')}
           onClick={selectAndFx}>FX</button>
       </div>
     </article>

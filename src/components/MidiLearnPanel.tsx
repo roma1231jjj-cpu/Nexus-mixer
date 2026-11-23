@@ -4,6 +4,8 @@ import { useMidiLearn } from '../lib/midiLearnContext'
 import { useMixer } from '../store/useMixer'
 import { BUS_ORDER, STRIP_ORDER } from '../data/defaults'
 import { Select } from './controls/Select'
+import { useT, type TKey } from '../i18n'
+import { RichText } from './RichText'
 
 const PARAMS = [
   { value: 'gainDb', label: 'Level', min: -60, max: 12 },
@@ -12,15 +14,16 @@ const PARAMS = [
   { value: 'solo', label: 'Solo', min: 0, max: 1 },
 ]
 
-const STATUS_LABEL: Record<string, string> = {
-  unsupported: 'Web MIDI не поддерживается',
-  idle: 'MIDI: не подключено',
-  connecting: 'MIDI: запрос доступа…',
-  ready: 'MIDI: подключено',
-  denied: 'MIDI: доступ запрещён',
+const STATUS_LABEL: Record<string, TKey> = {
+  unsupported: 'midi.unsupported',
+  idle: 'midi.idle',
+  connecting: 'midi.connecting',
+  ready: 'midi.ready',
+  denied: 'midi.denied',
 }
 
 export function MidiLearnPanel() {
+  const t = useT()
   const { mappings, isLearning, learningTarget, midiStatus, inputCount, startLearn, cancelLearn, removeMapping, injectCc, connectMidi } =
     useMidiLearn()
   const strips = useMixer((s) => s.strips)
@@ -52,12 +55,12 @@ export function MidiLearnPanel() {
         <span className="midi-title">MIDI Learn</span>
         <span className={`midi-status ${midiStatus}`}>
           <i className="dot" />
-          {STATUS_LABEL[midiStatus]}
+          {t(STATUS_LABEL[midiStatus] ?? 'midi.idle')}
           {midiStatus === 'ready' ? ` · ${inputCount} in` : ''}
         </span>
         {(midiStatus === 'idle' || midiStatus === 'denied') && (
           <button type="button" className="btn small" onClick={connectMidi}>
-            Подключить
+            {t('midi.connect')}
           </button>
         )}
         <span className="midi-count">{mappings.length}</span>
@@ -67,8 +70,8 @@ export function MidiLearnPanel() {
         <Select
           value={scope}
           options={[
-            { value: 'strip', label: 'Канал' },
-            { value: 'bus', label: 'Шина' },
+            { value: 'strip', label: t('midi.scope.strip') },
+            { value: 'bus', label: t('midi.scope.bus') },
           ]}
           onChange={(value) => {
             const next = value as 'strip' | 'bus'
@@ -82,7 +85,7 @@ export function MidiLearnPanel() {
         <Select value={param} options={params} onChange={setParam} small />
         {isLearning ? (
           <button type="button" className="btn small danger" onClick={cancelLearn}>
-            Отмена
+            {t('midi.cancel')}
           </button>
         ) : (
           <button type="button" className="btn small primary" onClick={beginLearn}>
@@ -93,8 +96,7 @@ export function MidiLearnPanel() {
 
       {isLearning && learningTarget ? (
         <div className="midi-learn-hint">
-          Двиньте ручку или фейдер на MIDI-контроллере — назначение на{' '}
-          <b>{learningTarget.target}</b>. Без железа используйте тест-слайдеры ниже.
+          <RichText text={t('midi.learnHint', { target: learningTarget.target })} />
         </div>
       ) : null}
 
@@ -107,7 +109,7 @@ export function MidiLearnPanel() {
           step={1}
           defaultValue={64}
           onChange={(event) => injectCc(1, Number(event.target.value), 0)}
-          aria-label="Тестовый CC 1"
+          aria-label={t('midi.testCc', { n: 1 })}
         />
         <span>CC#7</span>
         <input
@@ -117,7 +119,7 @@ export function MidiLearnPanel() {
           step={1}
           defaultValue={64}
           onChange={(event) => injectCc(7, Number(event.target.value), 0)}
-          aria-label="Тестовый CC 7"
+          aria-label={t('midi.testCc', { n: 7 })}
         />
       </div>
 
@@ -132,7 +134,7 @@ export function MidiLearnPanel() {
               <button
                 type="button"
                 className="icon-btn"
-                aria-label="Удалить назначение"
+                aria-label={t('midi.remove')}
                 onClick={() => removeMapping(mapping.id)}
               >
                 <Trash2 size={11} />
@@ -141,7 +143,7 @@ export function MidiLearnPanel() {
           ))}
         </div>
       ) : (
-        <p className="midi-empty">Назначений нет. Выберите параметр и нажмите Learn.</p>
+        <p className="midi-empty">{t('midi.empty')}</p>
       )}
     </section>
   )

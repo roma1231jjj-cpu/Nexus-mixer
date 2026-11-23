@@ -1,5 +1,7 @@
-import { useRef, type PointerEvent } from 'react'
+import {
+  useRef, type PointerEvent } from 'react'
 import type { EqBand } from '../../types'
+import { t } from '../../i18n'
 import { EQ_DB_RANGE, bandNode, eqPath } from '../../lib/eqCurve'
 import { clamp, formatHz, freqToX, xToFreq } from '../../lib/format'
 import { useSize } from '../../lib/useSize'
@@ -38,7 +40,7 @@ export function EqEditor({ bands, sampleRate, color, onBandChange }: EqEditorPro
     <div
       className="eq-editor"
       ref={ref}
-      title="Тяните точку: X — частота, Y — усиление (для HP/LP — добротность). Двойной клик — сброс полосы."
+      title={t('eq.pointTip')}
     >
       <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
         <defs>

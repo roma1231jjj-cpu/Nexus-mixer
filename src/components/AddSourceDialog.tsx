@@ -4,8 +4,10 @@ import { useMixer } from '../store/useMixer'
 import { useUi } from '../store/useUi'
 import { STRIP_ORDER } from '../data/defaults'
 import { DeviceSelect } from './controls/DeviceSelect'
+import { useT } from '../i18n'
 
 export function AddSourceDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const t = useT()
   const devices = useMixer((s) => s.devices)
   const strips = useMixer((s) => s.strips)
   const sourceCount = useMixer((s) => s.sourceCount)
@@ -35,7 +37,7 @@ export function AddSourceDialog({ open, onClose }: { open: boolean; onClose: () 
     if (wasOpen.current) return
     wasOpen.current = true
     setDeviceId(availableDevices[0]?.id ?? '')
-    setName(`Вход ${nextNumber}`)
+    setName(t('addSource.defaultName', { n: nextNumber }))
   }, [open, availableDevices, nextNumber])
 
   useEffect(() => {
@@ -58,30 +60,30 @@ export function AddSourceDialog({ open, onClose }: { open: boolean; onClose: () 
         className="dialog add-source-dialog"
         role="dialog"
         aria-modal="true"
-        aria-label="Добавить источник"
+        aria-label={t('addSource.aria')}
         onMouseDown={(event) => event.stopPropagation()}
       >
         <header className="dialog-head">
           <span className="dialog-icon"><Plus size={17} /></span>
           <div>
-            <h2>Добавить источник</h2>
-            <p>Свободный вход появится на консоли и в матрице маршрутизации.</p>
+            <h2>{t('addSource.title')}</h2>
+            <p>{t('addSource.sub')}</p>
           </div>
-          <button type="button" className="icon-btn" onClick={onClose} aria-label="Закрыть">
+          <button type="button" className="icon-btn" onClick={onClose} aria-label={t('common.close')}>
             <X size={17} />
           </button>
         </header>
 
         <div className="dialog-body">
           <div className="dialog-field">
-            <label htmlFor="add-source-name">Название</label>
+            <label htmlFor="add-source-name">{t('addSource.name')}</label>
             <div className="dialog-text-input">
               <Mic size={15} />
               <input
                 id="add-source-name"
                 value={name}
                 maxLength={24}
-                placeholder="Например: Телефон"
+                placeholder={t('addSource.namePlaceholder')}
                 onChange={(event) => setName(event.target.value)}
                 autoFocus
               />
@@ -89,27 +91,25 @@ export function AddSourceDialog({ open, onClose }: { open: boolean; onClose: () 
           </div>
 
           <div className="dialog-field">
-            <label>Устройство ввода</label>
+            <label>{t('addSource.inputDevice')}</label>
             <DeviceSelect
               value={deviceId}
               devices={availableDevices}
               kinds={['input', 'virtual-capture']}
               onChange={setDeviceId}
-              ariaLabel="Устройство нового источника"
-              emptyLabel="Без устройства — назначить позже"
+              ariaLabel={t('addSource.deviceAria')}
+              emptyLabel={t('addSource.noDevice')}
               tone="input"
             />
           </div>
 
           <p className="dialog-note">
-            {full
-              ? 'Все 8 слотов заняты.'
-              : `Будет добавлен слот ${nextNumber} из ${STRIP_ORDER.length}.`}
+            {full ? t('addSource.full') : t('addSource.slot', { n: nextNumber, total: STRIP_ORDER.length })}
           </p>
         </div>
 
         <footer className="dialog-foot">
-          <button type="button" className="btn" onClick={onClose}>Отмена</button>
+          <button type="button" className="btn" onClick={onClose}>{t('common.cancel')}</button>
           <button
             type="button"
             className="btn primary"
@@ -117,12 +117,12 @@ export function AddSourceDialog({ open, onClose }: { open: boolean; onClose: () 
             onClick={() => {
               const id = addSource(deviceId, name)
               if (id) {
-                notify(`Источник «${name.trim() || `Вход ${nextNumber}`}» добавлен`)
+                notify(t('addSource.added', { name: name.trim() || t('addSource.defaultName', { n: nextNumber }) }))
                 onClose()
               }
             }}
           >
-            <Plus size={14} /> Добавить источник
+            <Plus size={14} /> {t('addSource.add')}
           </button>
         </footer>
       </section>

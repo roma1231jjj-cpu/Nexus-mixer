@@ -8,6 +8,7 @@ import type { BusId, StripId } from '../types'
 import { BusMeter } from './controls/StereoMeter'
 import { HFader } from './controls/HFader'
 import { DeviceSelect } from './controls/DeviceSelect'
+import { useT } from '../i18n'
 
 /** Which strips are currently audible on this bus. */
 function activeSources(busId: BusId, strips: Record<StripId, any>, soloActive: boolean, vcaGroups: any[], ids: StripId[]) {
@@ -23,6 +24,7 @@ function activeSources(busId: BusId, strips: Record<StripId, any>, soloActive: b
 const isLockedName = (id: BusId) => id.startsWith('A')
 
 export function Bus({ id, variant = 'cable' }: { id: BusId; variant?: 'main' | 'cable' }) {
+  const t = useT()
   const bus = useMixer((s) => s.buses[id])
   const selected = useMixer((s) => s.selectionKind === 'bus' && s.selectedBusId === id)
   const setBus = useMixer((s) => s.setBus)
@@ -63,7 +65,7 @@ export function Bus({ id, variant = 'cable' }: { id: BusId; variant?: 'main' | '
         // user aimed for a mute/fader control; the FX button is deliberate.
         if (!control) select()
       }}
-      aria-label={`Шина ${bus.name}`}
+      aria-label={t('bus.aria', { name: bus.name })}
     >
       <header className="bus-head">
         <span className="bus-badge" aria-hidden="true">{bus.id}</span>
@@ -71,7 +73,7 @@ export function Bus({ id, variant = 'cable' }: { id: BusId; variant?: 'main' | '
         {locked ? (
           <span
             className="bus-name-static"
-            data-tip={`${bus.name} · имя физического устройства закреплено`}
+            data-tip={t('bus.nameLockedTip', { name: bus.name })}
           >
             {bus.name}
           </span>
@@ -81,7 +83,7 @@ export function Bus({ id, variant = 'cable' }: { id: BusId; variant?: 'main' | '
             value={bus.name}
             spellCheck={false}
             maxLength={28}
-            aria-label={`Название шины ${bus.id}`}
+            aria-label={t('bus.nameAria', { id: bus.id })}
             onClick={(event) => event.stopPropagation()}
             onFocus={() => {
               nameBeforeEdit.current = bus.name
@@ -94,7 +96,7 @@ export function Bus({ id, variant = 'cable' }: { id: BusId; variant?: 'main' | '
                 return
               }
               const next = event.target.value.trim()
-              setBus(id, { name: next || `Кабель ${id.slice(1)}` })
+              setBus(id, { name: next || t('bus.defaultName', { n: id.slice(1) }) })
             }}
             onKeyDown={(event) => {
               if (event.key === 'Enter') event.currentTarget.blur()
@@ -116,8 +118,8 @@ export function Bus({ id, variant = 'cable' }: { id: BusId; variant?: 'main' | '
           devices={devices}
           kinds={variant === 'main' ? ['output'] : ['virtual-playback']}
           onChange={(deviceId) => setBus(id, { deviceId })}
-          ariaLabel={`Устройство выхода ${bus.name}`}
-          emptyLabel={variant === 'main' ? 'Выход не назначен' : 'Кабель не установлен'}
+          ariaLabel={t('bus.outputDevice', { name: bus.name })}
+          emptyLabel={variant === 'main' ? t('bus.noOutput') : t('bus.noCable')}
           tone={variant === 'main' ? 'output' : 'cable'}
         />
       </div>
@@ -127,8 +129,8 @@ export function Bus({ id, variant = 'cable' }: { id: BusId; variant?: 'main' | '
           value={bus.gainDb}
           onChange={(value) => setBus(id, { gainDb: value })}
           color={bus.color}
-          ariaLabel={`Громкость ${bus.name}`}
-          hint={`${bus.id} · ${bus.name}${device ? ` · ${device.name}` : ' · устройство не назначено'}`}
+          ariaLabel={t('bus.gainAria', { name: bus.name })}
+          hint={device ? t('bus.hintDevice', { id: bus.id, name: bus.name, device: device.name }) : t('bus.hint', { id: bus.id, name: bus.name }) + t('bus.hintNoDevice')}
         />
         <BusMeter left={meter.left} right={meter.right} />
       </div>
@@ -136,7 +138,7 @@ export function Bus({ id, variant = 'cable' }: { id: BusId; variant?: 'main' | '
       <footer className="bus-foot">
         <div
           className="bus-sources"
-          data-tip={sources.length > 0 ? `Сюда идёт: ${sources.join(', ')}` : 'Никто не направлен в этот выход'}
+          data-tip={sources.length > 0 ? t('bus.sourcesTip', { list: sources.join(', ') }) : t('bus.noSources')}
         >
           {visibleStrips.map((sid) => (
             <span
@@ -156,7 +158,7 @@ export function Bus({ id, variant = 'cable' }: { id: BusId; variant?: 'main' | '
             type="button"
             className={`mini-toggle mute${bus.mute ? ' on' : ''}`}
             aria-pressed={bus.mute}
-            data-tip="Заглушить этот выход"
+            data-tip={t('bus.muteTip')}
             onClick={(event) => {
               event.stopPropagation()
               setBus(id, { mute: !bus.mute })
@@ -170,7 +172,7 @@ export function Bus({ id, variant = 'cable' }: { id: BusId; variant?: 'main' | '
                 type="button"
                 className={`mini-toggle${bus.mono ? ' on' : ''}`}
                 aria-pressed={bus.mono}
-                data-tip="Моно — объединить каналы"
+                data-tip={t('strip.monoTip')}
                 onClick={(event) => {
                   event.stopPropagation()
                   setBus(id, { mono: !bus.mono })
@@ -182,7 +184,7 @@ export function Bus({ id, variant = 'cable' }: { id: BusId; variant?: 'main' | '
                 type="button"
                 className={`mini-toggle${bus.dim ? ' on' : ''}`}
                 aria-pressed={bus.dim}
-                data-tip="Dim −20 dB"
+                data-tip={t('bus.dimTip')}
                 onClick={(event) => {
                   event.stopPropagation()
                   setBus(id, { dim: !bus.dim })
@@ -195,7 +197,7 @@ export function Bus({ id, variant = 'cable' }: { id: BusId; variant?: 'main' | '
           <button
             type="button"
             className="mini-toggle"
-            data-tip="Настроить звук этого выхода"
+            data-tip={t('bus.fxTip')}
             onClick={(event) => {
               event.stopPropagation()
               openFx()

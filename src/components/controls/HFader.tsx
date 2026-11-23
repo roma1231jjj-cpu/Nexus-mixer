@@ -1,5 +1,7 @@
-import { useRef, type CSSProperties, type PointerEvent } from 'react'
+import {
+  useRef, type CSSProperties, type PointerEvent } from 'react'
 import { FADER_MAX, FADER_MIN, clamp } from '../../lib/format'
+import { t } from '../../i18n'
 
 interface HFaderProps {
   value: number
@@ -11,7 +13,7 @@ interface HFaderProps {
   hint?: string
 }
 
-export function HFader({ value, onChange, color, min = FADER_MIN, max = FADER_MAX, ariaLabel = 'Уровень', hint }: HFaderProps) {
+export function HFader({ value, onChange, color, min = FADER_MIN, max = FADER_MAX, ariaLabel = t('tip.level'), hint }: HFaderProps) {
   const ref = useRef<HTMLDivElement>(null)
   const position = ((clamp(value, min, max) - min) / (max - min)) * 100
   const commit = (next: number) => onChange(clamp(Math.round(next * 10) / 10, min, max))
@@ -29,7 +31,7 @@ export function HFader({ value, onChange, color, min = FADER_MIN, max = FADER_MA
       ref={ref}
       className="hfader"
       style={{ '--bus-color': color ?? 'var(--accent)' } as CSSProperties}
-      data-tip={hint ?? `${ariaLabel} — тяните, двойной клик сбрасывает на 0 dB`}
+      data-tip={hint ?? t('tip.dragReset', { label: ariaLabel })}
       role="slider"
       tabIndex={0}
       aria-label={ariaLabel}

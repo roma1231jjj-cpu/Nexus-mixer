@@ -8,26 +8,31 @@ import { Knob } from '../controls/Knob'
 import { Switch } from '../controls/Switch'
 import { Select } from '../controls/Select'
 import { AiConfig } from './AiConfig'
+import { useT, type TKey } from '../../i18n'
+import { RichText } from '../RichText'
 
 const MODES = [
-  { id: 'off', label: 'OFF', hint: 'Тракт без ИИ' },
-  { id: 'dsp', label: 'DSP', hint: 'Только DSP-пресеты' },
-  { id: 'ai', label: 'AI', hint: 'Только конверсия' },
-  { id: 'hybrid', label: 'HYBRID', hint: 'DSP + конверсия' },
+  { id: 'off', label: 'OFF', hint: 'ai.mode.off' },
+  { id: 'dsp', label: 'DSP', hint: 'ai.mode.dsp' },
+  { id: 'ai', label: 'AI', hint: 'ai.mode.ai' },
+  { id: 'hybrid', label: 'HYBRID', hint: 'ai.mode.hybrid' },
 ] as const
 
 const VOICE_PRESETS = [
-  { id: 'monster', name: 'Монстр', pitch: -7, formant: -5, mix: 100, hint: 'Глубокий, тяжёлый, страшный' },
-  { id: 'demon', name: 'Демон', pitch: -10, formant: -7, mix: 95, hint: 'Максимально низкий и злой' },
-  { id: 'giant', name: 'Великан', pitch: -4, formant: -3, mix: 100, hint: 'Большой и спокойный' },
-  { id: 'child', name: 'Ребёнок', pitch: 5, formant: 4, mix: 100, hint: 'Высокий детский голос' },
-  { id: 'girl', name: 'Женский', pitch: 3, formant: 3, mix: 100, hint: 'Мягкий женский тембр' },
-  { id: 'alien', name: 'Пришелец', pitch: 8, formant: 6, mix: 100, hint: 'Тонкий и странный' },
-  { id: 'robot', name: 'Робот', pitch: 0, formant: 4, mix: 100, hint: 'Металлический оттенок', robot: true },
-  { id: 'whisper', name: 'Шёпот', pitch: 1, formant: 5, mix: 100, hint: 'Воздушный, тихий' },
+  { id: 'monster', pitch: -7, formant: -5, mix: 100 },
+  { id: 'demon', pitch: -10, formant: -7, mix: 95 },
+  { id: 'giant', pitch: -4, formant: -3, mix: 100 },
+  { id: 'child', pitch: 5, formant: 4, mix: 100 },
+  { id: 'girl', pitch: 3, formant: 3, mix: 100 },
+  { id: 'alien', pitch: 8, formant: 6, mix: 100 },
+  { id: 'robot', pitch: 0, formant: 4, mix: 100, robot: true },
+  { id: 'whisper', pitch: 1, formant: 5, mix: 100 },
 ] as const
 
+const voiceKey = (id: string, part: 'name' | 'hint'): TKey => `voice.${id}.${part}` as TKey
+
 export function AiPanel() {
+  const t = useT()
   const ai = useMixer((s) => s.ai)
   const models = useMixer((s) => s.aiModels)
   const status = useMixer((s) => s.status)
@@ -61,8 +66,8 @@ export function AiPanel() {
     if (result.ok) setAi({ local: false, enabled: true, mode: 'ai' })
     notify(
       result.ok
-        ? `Sidecar подключён · ${result.ai?.backend ?? 'unknown'}`
-        : result.error ?? 'Не удалось подключить sidecar',
+        ? t('ai.connected', { backend: result.ai?.backend ?? t('ai.unknown') })
+        : result.error ?? t('ai.connectFailed'),
     )
   }
 
@@ -71,7 +76,7 @@ export function AiPanel() {
     const result = await disconnectAiSidecar()
     setBusy(false)
     if (result.ok) setAi({ local: true, mode: 'dsp' })
-    notify(result.ok ? 'Sidecar отключён · включён локальный голос' : result.error ?? 'Не удалось отключить sidecar')
+    notify(result.ok ? t('ai.disconnected') : result.error ?? t('ai.disconnectFailed'))
   }
 
   const applyVoice = (preset: (typeof VOICE_PRESETS)[number]) => {
@@ -85,7 +90,7 @@ export function AiPanel() {
       mix: preset.mix,
       robot: 'robot' in preset ? Boolean(preset.robot) : false,
     })
-    notify(`Голос: ${preset.name}`)
+    notify(t('ai.voice', { name: t(voiceKey(preset.id, 'name')) }))
   }
 
   const ping = async () => {
@@ -94,8 +99,8 @@ export function AiPanel() {
     setBusy(false)
     notify(
       result.ok
-        ? `Sidecar отвечает · ${result.ai?.roundtripMs?.toFixed(1) ?? '—'} мс`
-        : result.error ?? 'Sidecar не ответил',
+        ? t('ai.pong', { ms: result.ai?.roundtripMs?.toFixed(1) ?? '—' })
+        : result.error ?? t('ai.noPong'),
     )
   }
 
@@ -109,9 +114,7 @@ export function AiPanel() {
             {ai.local ? 'LOCAL DSP' : 'RVC v2'}
           </span>
         </div>
-        <div className="ai-hero-sub">
-          Локальная конверсия тембра. Аудио не покидает машину.
-        </div>
+        <div className="ai-hero-sub">{t('ai.heroSub')}</div>
         <div className="ai-status">
           <span
             className={`dot ${connected ? 'good' : link.state === 'error' ? 'bad' : ''}`}
@@ -123,7 +126,7 @@ export function AiPanel() {
             }}
           />
           <span>
-            <b>{link.backend}</b> · {link.state === 'offline' ? 'sidecar не подключён' : link.state} · RTF{' '}
+            <b>{link.backend}</b> · {link.state === 'offline' ? t('ai.offlineSidecar') : link.state} · RTF{' '}
             {connected ? link.rtf.toFixed(2) : model ? model.rtf.toFixed(2) : '—'}
           </span>
         </div>
@@ -132,12 +135,12 @@ export function AiPanel() {
       <section className="fx-block voice-lab">
         <header className="fx-block-head">
           <span className="fx-icon"><Waves size={13} /></span>
-          <span className="fx-title">Локальные голоса</span>
-          <span className="fx-sub">{ai.local && ai.enabled ? 'DSP · реальное время' : 'выключено'}</span>
+          <span className="fx-title">{t('ai.localVoices')}</span>
+          <span className="fx-sub">{ai.local && ai.enabled ? t('ai.liveDsp') : t('ai.off')}</span>
           <Switch
             on={ai.local}
             onChange={(value) => setAi({ local: value, enabled: value || ai.enabled, mode: value ? 'dsp' : ai.mode })}
-            ariaLabel="Локальный голос"
+            ariaLabel={t('ai.localSwitch')}
           />
         </header>
         <div className="fx-block-body">
@@ -150,9 +153,9 @@ export function AiPanel() {
                   type="button"
                   className={`voice-preset${active ? ' on' : ''}`}
                   onClick={() => applyVoice(preset)}
-                  title={preset.hint}
+                  title={t(voiceKey(preset.id, 'hint'))}
                 >
-                  <span className="voice-preset-name">{preset.name}</span>
+                  <span className="voice-preset-name">{t(voiceKey(preset.id, 'name'))}</span>
                   <span className="voice-preset-meta">{preset.pitch > 0 ? '+' : ''}{preset.pitch} st · formant {preset.formant > 0 ? '+' : ''}{preset.formant}</span>
                 </button>
               )
@@ -162,23 +165,23 @@ export function AiPanel() {
               className={`voice-preset off${!ai.enabled || !ai.local ? ' on' : ''}`}
               onClick={() => setAi({ enabled: false, local: false })}
             >
-              <span className="voice-preset-name">Без эффекта</span>
-              <span className="voice-preset-meta">обычный голос</span>
+              <span className="voice-preset-name">{t('voice.none.name')}</span>
+              <span className="voice-preset-meta">{t('voice.none.hint')}</span>
             </button>
           </div>
           <div className="field" style={{ marginTop: 10 }}>
-            <label htmlFor="ai-source">Источник голоса</label>
+            <label htmlFor="ai-source">{t('ai.source')}</label>
             <Select
               value={ai.source ?? 'hw1'}
               options={STRIP_ORDER.slice(0, 6).map((id) => ({
                 value: id,
-                label: `${strips[id]?.name ?? id} · ${strips[id]?.deviceId || 'нет устройства'}`,
+                label: `${strips[id]?.name ?? id} · ${strips[id]?.deviceId || t('ai.noDevice')}`,
               }))}
               onChange={(val) => setAi({ source: val as typeof ai.source })}
             />
           </div>
           <p className="tiny faint" style={{ margin: '8px 0 0', lineHeight: 1.45 }}>
-            Работает сразу, без Python и скачивания моделей. Для тонкой настройки — PITCH, FORMANT и MIX ниже.
+            {t('ai.voiceNote')}
           </p>
         </div>
       </section>
@@ -190,24 +193,24 @@ export function AiPanel() {
           <span className="fx-icon">
             <Plug size={13} />
           </span>
-          <span className="fx-title">Локальный sidecar</span>
+          <span className="fx-title">{t('ai.sidecar')}</span>
           <span className="fx-sub">{connected ? link.backend : link.state.toUpperCase()}</span>
         </header>
         <div className="fx-block-body">
           <div className="row" style={{ justifyContent: 'space-between', gap: 8 }}>
             <span className="tiny faint">{link.endpoint}</span>
             <span className="tag">
-              {link.sampleRate} Hz · {link.chunkFrames} кадров
+              {link.sampleRate} Hz · {t('ai.frames', { n: link.chunkFrames })}
             </span>
           </div>
           <div className="row" style={{ marginTop: 8 }}>
             {connected ? (
               <button type="button" className="btn small grow" onClick={disconnect} disabled={busy}>
-                <Power size={12} /> Отключить
+                <Power size={12} /> {t('ai.disconnect')}
               </button>
             ) : (
               <button type="button" className="btn small grow" onClick={connect} disabled={busy}>
-                <Plug size={12} /> Подключить sidecar
+                <Plug size={12} /> {t('ai.connectSidecar')}
               </button>
             )}
             <button
@@ -215,7 +218,7 @@ export function AiPanel() {
               className="btn small"
               onClick={ping}
               disabled={busy || !connected}
-              title="Проверить связь (ping)"
+              title={t('ai.pingTip')}
             >
               <RefreshCw size={12} />
             </button>
@@ -225,7 +228,7 @@ export function AiPanel() {
           </p>
           {link.model ? (
             <p className="tiny faint" style={{ margin: '4px 0 0' }}>
-              Модель: <span className="accent">{link.model}</span>
+              {t('ai.model')} <span className="accent">{link.model}</span>
             </p>
           ) : null}
         </div>
@@ -236,9 +239,9 @@ export function AiPanel() {
           <span className="fx-icon">
             <Waves size={13} />
           </span>
-          <span className="fx-title">Режим тракта</span>
+          <span className="fx-title">{t('ai.chainMode')}</span>
           <span className="fx-sub">{ai.enabled ? ai.mode.toUpperCase() : 'BYPASS'}</span>
-          <Switch on={ai.enabled} onChange={(value) => setAi({ enabled: value })} ariaLabel="Включить ИИ-голос" />
+          <Switch on={ai.enabled} onChange={(value) => setAi({ enabled: value })} ariaLabel={t('ai.aiSwitch')} />
         </header>
         <div className="fx-block-body">
           <div className="seg" style={{ width: '100%' }}>
@@ -246,7 +249,7 @@ export function AiPanel() {
               <button
                 key={item.id}
                 type="button"
-                title={item.hint}
+                title={t(item.hint)}
                 className={mode === item.id ? 'on' : ''}
                 style={{ flex: 1 }}
                 onClick={() => {
@@ -266,8 +269,8 @@ export function AiPanel() {
           <span className="fx-icon">
             <Cpu size={13} />
           </span>
-          <span className="fx-title">Модель голоса</span>
-          <span className="fx-sub">{models.filter((m) => m.installed).length} установлено</span>
+          <span className="fx-title">{t('ai.voiceModel')}</span>
+          <span className="fx-sub">{t('ai.installed', { n: models.filter((m) => m.installed).length })}</span>
         </header>
         <div className="fx-block-body">
           <div className="model-list">
@@ -278,7 +281,7 @@ export function AiPanel() {
                 className={`model-card${item.id === ai.modelId ? ' on' : ''}`}
                 onClick={() => {
                   setAi({ modelId: item.id })
-                  if (!item.installed) notify(`«${item.name}» ещё не скачана — нажмите «СКАЧАТЬ»`)
+                  if (!item.installed) notify(t('ai.notDownloaded', { name: item.name }))
                 }}
               >
                 <span className="model-avatar">{item.name.slice(0, 1)}</span>
@@ -295,16 +298,16 @@ export function AiPanel() {
                   </span>
                 </span>
                 <span className="model-install" style={item.installed ? { color: 'var(--good)' } : undefined}>
-                  {item.installed ? '✓' : 'СКАЧАТЬ'}
+                  {item.installed ? '✓' : t('ai.download')}
                 </span>
               </button>
             ))}
           </div>
           <div className="row" style={{ marginTop: 8 }}>
-            <button type="button" className="btn small grow" onClick={() => notify('Импорт модели: выберите .onnx + .index в диалоге')}>
-              <Download size={12} /> Импорт модели
+            <button type="button" className="btn small grow" onClick={() => notify(t('ai.importNote'))}>
+              <Download size={12} /> {t('ai.importModel')}
             </button>
-            <button type="button" className="btn small" onClick={() => notify('Папка моделей: %APPDATA%\\Nexus-Mixer\\models')}>
+            <button type="button" className="btn small" onClick={() => notify(t('ai.modelsFolder'))}>
               <FolderOpen size={12} />
             </button>
           </div>
@@ -316,7 +319,7 @@ export function AiPanel() {
           <span className="fx-icon">
             <Gauge size={13} />
           </span>
-          <span className="fx-title">Параметры конверсии</span>
+          <span className="fx-title">{t('ai.convParams')}</span>
           <span className="fx-sub">{ai.chunkMs} ms chunk</span>
         </header>
         <div className="fx-block-body">
@@ -397,44 +400,43 @@ export function AiPanel() {
           </div>
 
           <div className="field" style={{ marginTop: 12 }}>
-            <label htmlFor="ai-chunk">Размер чанка</label>
+            <label htmlFor="ai-chunk">{t('ai.chunkSize')}</label>
             <Select
               value={String(ai.chunkMs)}
               options={[
-                { value: '40', label: '40 ms — минимальная задержка' },
-                { value: '80', label: '80 ms' },
-                { value: '120', label: '120 ms — баланс' },
-                { value: '160', label: '160 ms' },
-                { value: '240', label: '240 ms' },
-                { value: '320', label: '320 ms — максимальное качество' },
+                { value: '40', label: t('ai.chunk40') },
+                { value: '80', label: t('ai.chunk80') },
+                { value: '120', label: t('ai.chunk120') },
+                { value: '160', label: t('ai.chunk160') },
+                { value: '240', label: t('ai.chunk240') },
+                { value: '320', label: t('ai.chunk320') },
               ]}
               onChange={(val) => setAi({ chunkMs: Number(val) as typeof ai.chunkMs })}
             />
           </div>
 
           <div className="field" style={{ marginTop: 9 }}>
-            <label htmlFor="ai-gpu">Устройство инференса</label>
+            <label htmlFor="ai-gpu">{t('ai.inference')}</label>
             <Select
               value={String(ai.gpuIndex)}
               options={[
-                { value: '0', label: 'GPU 0 — CUDA' },
-                { value: '1', label: 'GPU 1 — CUDA' },
-                { value: '-1', label: 'CPU — медленно, но совместимо' },
+                { value: '0', label: t('ai.gpu0') },
+                { value: '1', label: t('ai.gpu1') },
+                { value: '-1', label: t('ai.cpu') },
               ]}
               onChange={(val) => setAi({ gpuIndex: Number(val) })}
             />
           </div>
 
           <div className="toggle-row">
-            <span className="t-label">Шумоподавление до конверсии</span>
-            <Switch on={ai.denoise} onChange={(value) => setAi({ denoise: value })} ariaLabel="Шумоподавление" />
+            <span className="t-label">{t('ai.denoise')}</span>
+            <Switch on={ai.denoise} onChange={(value) => setAi({ denoise: value })} ariaLabel={t('ai.denoiseAria')} />
           </div>
         </div>
       </section>
 
       <div className="ai-warning">
-        В Discord / OBS выберите вход <span className="accent">Nexus Cable B1</span>, направьте микрофон
-        на шину B1 — и включите локальный голос выше. Sidecar не обязателен.
+        <RichText text={t('ai.warning')} />
       </div>
     </>
   )

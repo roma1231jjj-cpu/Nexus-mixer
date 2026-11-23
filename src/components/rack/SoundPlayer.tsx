@@ -15,6 +15,7 @@ import {
   type SoundPadState,
 } from '../../lib/soundBank'
 import { Select } from '../controls/Select'
+import { useT } from '../../i18n'
 
 /* ──────────────────── Master volume for sound player ──────────────────── */
 
@@ -39,6 +40,7 @@ export function setSoundMasterVolume(v: number) {
 /* ──────────────────── Component ──────────────────── */
 
 export function SoundPlayer() {
+  const t = useT()
   const strips = useMixer((s) => s.strips) as Record<string, import('../../types').Strip>
   const buses = useMixer((s) => s.buses) as Record<string, import('../../types').Bus>
   const notify = useUi((s) => s.notify)
@@ -90,7 +92,7 @@ export function SoundPlayer() {
     for (let i = 0; i < files.length; i++) {
       const file = files[i]
       if (!file.type.startsWith('audio/')) {
-        notify(`«${file.name}» — не аудиофайл, пропущен`)
+        notify(t('pad.notAudio', { name: file.name }))
         continue
       }
       try {
@@ -98,14 +100,14 @@ export function SoundPlayer() {
         newSamples.push(sample)
         newBuffers[sample.id] = buffer
       } catch {
-        notify(`«${file.name}» — не удалось декодировать`)
+        notify(t('pad.decodeFailed', { name: file.name }))
       }
     }
 
     if (newSamples.length > 0) {
       setSamples((prev) => [...prev, ...newSamples])
       setBuffers((prev) => ({ ...prev, ...newBuffers }))
-      notify(`Загружено ${newSamples.length} сэмплов`)
+      notify(t('pad.loaded', { n: newSamples.length }))
     }
   }
 
@@ -236,7 +238,7 @@ export function SoundPlayer() {
           <Music size={13} />
         </span>
         <span className="fx-title">Pads</span>
-        <span className="fx-sub">{samples.length} сэмплов{playingCount > 0 ? ` · ▶ ${playingCount}` : ''}</span>
+        <span className="fx-sub">{t('pad.samples', { n: samples.length })}{playingCount > 0 ? t('pad.playing', { n: playingCount }) : ''}</span>
         <button type="button" className="icon-btn" style={{ width: 22, height: 22 }} onClick={handleStopAll} title="Stop All">
           <Square size={11} />
         </button>
@@ -258,7 +260,7 @@ export function SoundPlayer() {
             style={{ flex: 1, height: 28 }}
             onClick={() => fileInputRef.current?.click()}
           >
-            <Upload size={12} /> Загрузить звуки
+            <Upload size={12} /> {t('pad.upload')}
           </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: 3, width: 100 }}>
             <Volume2 size={10} style={{ color: 'var(--faint)' }} />
@@ -274,7 +276,7 @@ export function SoundPlayer() {
                 setSoundMasterVolume(v)
               }}
               style={{ flex: 1, height: 3, accentColor: 'var(--accent)' }}
-              title={`Master Volume: ${Math.round(masterVolume * 100)}%`}
+              title={t('pad.masterVolume', { n: Math.round(masterVolume * 100) })}
             />
             <span style={{ fontSize: 8, fontFamily: 'var(--font-mono)', color: 'var(--faint)', width: 30, textAlign: 'right' }}>
               {Math.round(masterVolume * 100)}%
@@ -282,12 +284,12 @@ export function SoundPlayer() {
           </div>
           {samples.length > 0 && (
             <button type="button" className="btn small" onClick={handleStopAll}>
-              <Square size={11} /> Стоп
+              <Square size={11} /> {t('pad.stop')}
             </button>
           )}
         </div>
 
-        {/* Pad Grid — как на реальном контроллере */}
+        {/* Pad grid, like on real hardware */}
         {samples.length > 0 ? (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3, marginBottom: 8 }}>
             {samples.map((sample) => {
@@ -377,10 +379,8 @@ export function SoundPlayer() {
             }}
           >
             <Music size={24} style={{ marginBottom: 6, opacity: 0.3 }} />
-            <div>Перетащите аудиофайлы сюда или нажмите «Загрузить»</div>
-            <div style={{ fontSize: 9, marginTop: 4, color: 'var(--faint)' }}>
-              Поддерживаются .wav, .mp3, .ogg, .flac
-            </div>
+            <div>{t('pad.empty')}</div>
+            <div style={{ fontSize: 9, marginTop: 4, color: 'var(--faint)' }}>{t('pad.formats')}</div>
           </div>
         )}
 
@@ -467,7 +467,7 @@ export function SoundPlayer() {
                 <Switch
                   on={selected.loop}
                   onChange={(v) => handleUpdate(selected.id, { loop: v })}
-                  ariaLabel="Loop"
+                  ariaLabel={t('pad.loopAria')}
                 />
                 Loop
               </label>
@@ -480,7 +480,7 @@ export function SoundPlayer() {
                 <Select
                   value={selected.targetStrip}
                   options={[
-                    { value: '', label: 'Master' },
+                    { value: '', label: t('pad.master') },
                     ...STRIP_ORDER.map((id) => ({ value: id, label: strips[id].name })),
                   ]}
                   onChange={(val) => handleUpdate(selected.id, { targetStrip: val, targetBus: '' })}
@@ -508,7 +508,7 @@ export function SoundPlayer() {
         {/* Help text */}
         {samples.length > 0 && !selected && (
           <div style={{ fontSize: 9, color: 'var(--faint)', marginTop: 4, textAlign: 'center' }}>
-            🔽 Клик — играть/стоп · ПКМ — выбрать для настроек · 🎯 Тащите файлы в область
+            {t('pad.hint')}
           </div>
         )}
 
@@ -521,7 +521,7 @@ export function SoundPlayer() {
               style={{ width: '100%', marginTop: 4 }}
               onClick={() => setSeqOpen((prev) => !prev)}
             >
-              <Music size={11} /> {seqOpen ? 'Скрыть секвенсор' : 'Step Sequencer'}
+              <Music size={11} /> {seqOpen ? t('pad.hideSequencer') : t('pad.sequencer')}
             </button>
             {seqOpen && (
               <Sequencer

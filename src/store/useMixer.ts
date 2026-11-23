@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { t } from '../i18n'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import type {
   AiSettings,
@@ -275,9 +276,9 @@ export const useMixer = create<MixerStore>()(
         const strip = state.strips[state.selectedStripId]
         const preset: Preset = {
           id: `user-${Date.now().toString(36)}`,
-          name: name.trim() || 'Мой пресет',
+          name: name.trim() || t('preset.defaultName'),
           category: 'custom',
-          description: `Сохранено с канала ${strip.name}`,
+          description: t('preset.savedFrom', { name: strip.name }),
           fx: {
             gate: { ...strip.fx.gate },
             compressor: { ...strip.fx.compressor },
@@ -461,8 +462,8 @@ export const useMixer = create<MixerStore>()(
           // instead of letting `undefined` disable the source selector.
           state.ai = { ...defaultAi, ...state.ai }
           if (!state.ai.source) state.ai.source = 'hw1'
-          // Миграция: старые сохранения хранят 5 шин (A1-B2), новые — 15 (A1-B12)
-          // Добавляем недостающие шины B3-B12 и маршруты для них.
+          // Migration: older saves keep 5 buses (A1-B2), the new ones keep 15 (A1-B12)
+          // Add the missing B3-B12 buses and their routes.
           const freshBuses = makeBuses()
           if (state.buses) {
             for (const id of BUS_ORDER) {

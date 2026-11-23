@@ -1,7 +1,9 @@
 import { RefreshCw } from 'lucide-react'
 import { useUpdater } from '../store/useUpdater'
+import { useT } from '../i18n'
 
 export function UpdateSettings() {
+  const t = useT()
   const status = useUpdater((s) => s.status)
   const version = useUpdater((s) => s.version)
   const progress = useUpdater((s) => s.progress)
@@ -12,20 +14,20 @@ export function UpdateSettings() {
 
   const label =
     status === 'checking'
-      ? 'Проверяем GitHub…'
+      ? t('updates.checking')
       : status === 'current'
-        ? 'Установлена актуальная версия'
+        ? t('updates.current')
         : status === 'available'
-          ? `Доступна версия ${version}`
+          ? t('updates.available', { version: version ?? '' })
           : status === 'downloading'
-            ? `Скачивание ${progress}%`
+            ? t('updates.downloading', { progress })
             : status === 'ready'
-              ? `Версия ${version} скачана`
+              ? t('updates.ready', { version: version ?? '' })
               : status === 'installing'
-                ? 'Установка…'
+                ? t('updates.installing')
                 : status === 'error'
-                  ? error ?? 'Ошибка проверки'
-                  : 'Проверка обновлений'
+                  ? (error ?? t('updates.error'))
+                  : t('updates.check')
 
   return (
     <div className="update-settings">
@@ -36,12 +38,12 @@ export function UpdateSettings() {
       <div className="update-settings-actions">
         {status === 'available' ? (
           <button type="button" className="btn small grow" onClick={() => void download()}>
-            Скачать
+            {t('updates.download')}
           </button>
         ) : null}
         {status === 'ready' ? (
           <button type="button" className="btn small grow" onClick={() => void install()}>
-            Установить
+            {t('updates.install')}
           </button>
         ) : null}
         <button
@@ -49,9 +51,9 @@ export function UpdateSettings() {
           className="btn small"
           onClick={() => void check()}
           disabled={status === 'checking' || status === 'downloading' || status === 'installing'}
-          title="Проверить обновления"
+          title={t('updates.checkTip')}
         >
-          <RefreshCw size={12} /> Проверить
+          <RefreshCw size={12} /> {t('settings.check')}
         </button>
       </div>
     </div>

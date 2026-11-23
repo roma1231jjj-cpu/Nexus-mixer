@@ -1,6 +1,8 @@
 import { useMixer } from '../store/useMixer'
+import { useT } from '../i18n'
 
 export function MultiSelectBar() {
+  const t = useT()
   const multiSelected = useMixer((s) => s.multiSelectedStripIds)
   const strips = useMixer((s) => s.strips)
   const setStrip = useMixer((s) => s.setStrip)
@@ -9,7 +11,7 @@ export function MultiSelectBar() {
 
   return (
     <div className="multi-bar">
-      <span className="multi-count">{multiSelected.length} канала</span>
+      <span className="multi-count">{t('multi.count', { count: multiSelected.length })}</span>
       <button
         type="button"
         className="mini-toggle"
@@ -43,7 +45,7 @@ export function MultiSelectBar() {
         className="mini-toggle"
         onClick={() => useMixer.getState().clearMultiSelection()}
       >
-        Снять
+        {t('multi.clear')}
       </button>
     </div>
   )

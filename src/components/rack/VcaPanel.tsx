@@ -2,8 +2,10 @@ import { Layers, Plus } from 'lucide-react'
 import { useMixer } from '../../store/useMixer'
 import { STRIP_ORDER } from '../../data/defaults'
 import { VcaGroupStrip } from './VcaGroupStrip'
+import { useT } from '../../i18n'
 
 export function VcaPanel() {
+  const t = useT()
   const vcaGroups = useMixer((s) => s.vcaGroups)
   const vcaAddStrip = useMixer((s) => s.vcaAddStrip)
   const vcaRemoveStrip = useMixer((s) => s.vcaRemoveStrip)
@@ -37,7 +39,7 @@ export function VcaPanel() {
           <Layers size={13} />
         </span>
         <span className="fx-title">VCA Groups</span>
-        <span className="fx-sub">{vcaGroups.length} groups</span>
+        <span className="fx-sub">{t('vca.count', { n: vcaGroups.length })}</span>
       </header>
       <div className="fx-block-body">
         {vcaGroups.map((group) => (
@@ -70,7 +72,7 @@ export function VcaPanel() {
           </div>
         ))}
         <button type="button" className="btn small vca-add" onClick={addGroup}>
-          <Plus size={11} /> Новая VCA-группа
+          <Plus size={11} /> {t('vca.newGroup')}
         </button>
       </div>
     </section>

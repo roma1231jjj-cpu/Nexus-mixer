@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { check, type Update } from '@tauri-apps/plugin-updater'
+import { t } from '../i18n'
 
 export type UpdateStatus =
   | 'idle'
@@ -44,7 +45,7 @@ export const useUpdater = create<UpdaterState>((set, get) => ({
 
   check: async (auto = false) => {
     if (!isDesktop()) {
-      if (!auto) set({ status: 'error', error: 'Автообновление доступно только в desktop-сборке.' })
+      if (!auto) set({ status: 'error', error: t('updates.desktopOnly') })
       return
     }
     const state = get()
@@ -80,7 +81,7 @@ export const useUpdater = create<UpdaterState>((set, get) => ({
         checkedAt: Date.now(),
       })
 
-      // "Автообновление" means the package is fetched in the background. The
+      // "Auto-update" means the package is fetched in the background. The
       // installer itself waits for the user, because replacing the binary
       // closes the app and interrupts audio.
       if (auto) await get().download()
