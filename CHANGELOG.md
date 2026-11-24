@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.4.3 — 2026-11-25
+
+### Оптимизация
+- Панели, которые открываются действием пользователя, вынесены в отдельные чанки через `React.lazy` + `Suspense`: док река (`RackDock`), вкладки AI (`AiPanel` вместе с `AiConfig`), PADS (`SoundPlayer` + `Sequencer`), REC (`RecordPanel`), настройки (`SettingsDrawer`), руководство (`GuideSheet`), горячие клавиши (`ShortcutsSheet`), матрица маршрутизации (`RoutingMatrix`), настройка кабелей (`CableSetupDialog`).
+- Пока чанк грузится, показывается скелет `PanelSkeleton` в цветах темы: той же высоты для дока, без второго затемнения и без повторной анимации слайда для drawer/dialog/overlay — открытие не мигает.
+- `vite.config.ts`: `manualChunks` разделяет `react`/`react-dom`, `lucide-react` и прочих вендоров (`zustand`, `clsx`, плагин обновлений).
+
+### Размеры бандла (production, до → после)
+- Основной чанк `index.js`: **521.98 КБ (gzip 154.67) → 165.85 КБ (gzip 51.60)** — меньше 500 КБ, предупреждение Rollup ушло.
+- Разделение вендоров: `react.js` 214.63 КБ (gzip 66.62), `lucide.js` 36.47 КБ (gzip 9.28), `vendor.js` 4.52 КБ (gzip 1.86), `window.js` 15.49 КБ (gzip 3.92).
+- Первый экран (index + react + lucide + vendor + window): **537.44 КБ → 436.96 КБ**, gzip **158.57 → 133.28 КБ** (−16 %).
+- Ленивые чанки грузятся по требованию: `RackDock` 42.32 КБ (gzip 12.68), `AiPanel` 19.95 (6.02), `SoundPlayer` 14.79 (5.16), `SettingsDrawer` 12.06 (3.22), `GuideSheet` 5.62 (1.69), `RecordPanel` 3.86 (1.42), `CableSetupDialog` 2.85 (1.17), `RoutingMatrix` 2.84 (1.34), `ShortcutsSheet` 1.62 (0.79).
+- Суммарно по всем JS-чанкам gzip 163.11 КБ против 158.57 КБ до разделения (+3 %) — плата за отдельные чанки; выигрыш на старте 25.3 КБ gzip. CSS не менялся: 267.89 КБ (gzip 45.14).
+
+### Изменено
+- Версия 0.4.3 в `package.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`; версия в статус-баре и в настройках больше не отстаёт от манифестов.
+
+### Проверено
+- `npx tsc --noEmit`, `npx vite build` (без предупреждения о чанке > 500 КБ), `cargo check --all-targets`.
+- Production-сборка в `vite preview`: старт грузит только `index/react/lucide/vendor/window`; AI, PADS, настройки подтягивают свои чанки по клику, ошибок в консоли нет.
+
 ## 0.4.2 — 2026-11-24
 
 ### Исправлено

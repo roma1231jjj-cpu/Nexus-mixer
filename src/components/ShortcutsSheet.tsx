@@ -65,3 +65,5 @@ export function ShortcutsSheet({ open, onClose }: ShortcutsSheetProps) {
     </>
   )
 }
+
+export default ShortcutsSheet

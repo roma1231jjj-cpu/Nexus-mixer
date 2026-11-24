@@ -128,3 +128,5 @@ export function RoutingMatrix() {
     </div>
   )
 }
+
+export default RoutingMatrix

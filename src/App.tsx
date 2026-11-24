@@ -1,18 +1,13 @@
-import { useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { Check, Plus } from 'lucide-react'
 import { TitleBar } from './components/TitleBar'
 import { Toolbar } from './components/Toolbar'
 import { Strip } from './components/Strip'
 import { Bus } from './components/Bus'
-import { RoutingMatrix } from './components/RoutingMatrix'
-import { RackDock } from './components/rack/RackDock'
 import { MultiSelectBar } from './components/MultiSelectBar'
 import { StatusBar } from './components/StatusBar'
-import { SettingsDrawer } from './components/SettingsDrawer'
-import { ShortcutsSheet } from './components/ShortcutsSheet'
-import { GuideSheet } from './components/GuideSheet'
 import { AddSourceDialog } from './components/AddSourceDialog'
-import { CableSetupDialog } from './components/CableSetupDialog'
+import { PanelSkeleton } from './components/PanelSkeleton'
 import { TooltipLayer } from './components/TooltipLayer'
 import { UpdateBanner } from './components/UpdateBanner'
 import { STRIP_ORDER, BUS_ORDER } from './data/defaults'
@@ -23,6 +18,13 @@ import { useUi } from './store/useUi'
 import { useUpdater } from './store/useUpdater'
 import { translate, useT, useLang, LOCALES } from './i18n'
 import { syncLocalizedDefaults } from './i18n/syncNames'
+
+const RoutingMatrix = lazy(() => import('./components/RoutingMatrix'))
+const RackDock = lazy(() => import('./components/rack/RackDock'))
+const SettingsDrawer = lazy(() => import('./components/SettingsDrawer'))
+const ShortcutsSheet = lazy(() => import('./components/ShortcutsSheet'))
+const GuideSheet = lazy(() => import('./components/GuideSheet'))
+const CableSetupDialog = lazy(() => import('./components/CableSetupDialog'))
 
 const A_BUSES = BUS_ORDER.filter((id) => id.startsWith('A'))
 const B_BUSES = BUS_ORDER.filter((id) => id.startsWith('B'))
@@ -85,6 +87,7 @@ export default function App() {
   const macros = useMixer((s) => s.macros)
   const runMacro = useMixer((s) => s.runMacro)
   const rackOpen = useUi((s) => s.rackOpen)
+  const guideOpen = useUi((s) => s.guideOpen)
   const toast = useUi((s) => s.toast)
   const visibleStrips = STRIP_ORDER.slice(0, sourceCount)
 
@@ -250,19 +253,43 @@ export default function App() {
 
           </main>
 
-          {matrixOpen ? <RoutingMatrix /> : null}
+          {matrixOpen ? (
+            <Suspense fallback={<PanelSkeleton variant="matrix" />}>
+              <RoutingMatrix />
+            </Suspense>
+          ) : null}
 
-          {rackOpen ? <RackDock onClose={() => useUi.getState().toggleRack()} /> : null}
+          {rackOpen ? (
+            <Suspense fallback={<PanelSkeleton />}>
+              <RackDock onClose={() => useUi.getState().toggleRack()} />
+            </Suspense>
+          ) : null}
         </div>
 
         <StatusBar />
       </div>
 
-      <SettingsDrawer />
+      {settingsOpen ? (
+        <Suspense fallback={<PanelSkeleton variant="drawer" />}>
+          <SettingsDrawer />
+        </Suspense>
+      ) : null}
       <AddSourceDialog open={addSourceOpen} onClose={() => setAddSourceOpen(false)} />
-      <CableSetupDialog open={cableSetupOpen} onClose={() => setCableSetupOpen(false)} />
-      <ShortcutsSheet open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
-      <GuideSheet />
+      {cableSetupOpen ? (
+        <Suspense fallback={<PanelSkeleton variant="dialog" />}>
+          <CableSetupDialog open={cableSetupOpen} onClose={() => setCableSetupOpen(false)} />
+        </Suspense>
+      ) : null}
+      {shortcutsOpen ? (
+        <Suspense fallback={<PanelSkeleton variant="drawer" />}>
+          <ShortcutsSheet open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+        </Suspense>
+      ) : null}
+      {guideOpen ? (
+        <Suspense fallback={<PanelSkeleton variant="drawer" />}>
+          <GuideSheet />
+        </Suspense>
+      ) : null}
       <TooltipLayer />
       <UpdateBanner />
 

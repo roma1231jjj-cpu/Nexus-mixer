@@ -168,3 +168,5 @@ export function RecordPanel() {
     </>
   )
 }
+
+export default RecordPanel

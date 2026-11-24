@@ -343,3 +343,5 @@ function FragmentRow({ text, first }: { text: string; first: boolean }) {
     </>
   )
 }
+
+export default GuideSheet

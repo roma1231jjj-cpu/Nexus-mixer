@@ -558,3 +558,5 @@ export function SoundPlayer() {
     </section>
   )
 }
+
+export default SoundPlayer

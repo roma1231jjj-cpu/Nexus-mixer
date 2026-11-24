@@ -50,7 +50,7 @@ export function SettingsDrawer() {
           <Settings size={16} className="accent" />
           <div>
             <h2>{t('settings.title')}</h2>
-            <div className="sub">Nexus-Mixer · v0.4.0</div>
+            <div className="sub">Nexus-Mixer · v0.4.3</div>
           </div>
           <button
             type="button"
@@ -380,7 +380,7 @@ export function SettingsDrawer() {
               <p>{t('settings.aboutText')}</p>
               <div className="about-meta">
                 <span>{t('brand.sign')}</span>
-                <span>0.4.0 · Tauri 2 · Rust</span>
+                <span>0.4.3 · Tauri 2 · Rust</span>
               </div>
               <button
                 type="button"
@@ -401,3 +401,5 @@ export function SettingsDrawer() {
     </>
   )
 }
+
+export default SettingsDrawer

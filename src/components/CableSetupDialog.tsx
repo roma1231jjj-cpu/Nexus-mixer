@@ -117,3 +117,5 @@ export function CableSetupDialog({ open, onClose }: { open: boolean; onClose: ()
     </div>
   )
 }
+
+export default CableSetupDialog

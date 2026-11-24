@@ -1,17 +1,20 @@
 import type { ReactNode } from 'react'
+import { Suspense, lazy } from 'react'
 import { X } from 'lucide-react'
 import { useMixer } from '../../store/useMixer'
 import { StripFx } from './StripFx'
 import { BusFx } from './BusFx'
-import { AiPanel } from './AiPanel'
 import { MacroPanel } from './MacroPanel'
-import { RecordPanel } from './RecordPanel'
 import { GlobalEq } from './GlobalEq'
 import { ScenePanel } from './ScenePanel'
-import { SoundPlayer } from './SoundPlayer'
 import { MidiLearnPanel } from '../MidiLearnPanel'
 import { VcaPanel } from './VcaPanel'
+import { PanelSkeleton } from '../PanelSkeleton'
 import { useT, type TKey } from '../../i18n'
+
+const AiPanel = lazy(() => import('./AiPanel'))
+const RecordPanel = lazy(() => import('./RecordPanel'))
+const SoundPlayer = lazy(() => import('./SoundPlayer'))
 
 const TITLES: Record<string, TKey> = {
   fx: 'rack.title.fx',
@@ -110,8 +113,12 @@ export function RackDock({ onClose }: { onClose: () => void }) {
             <X size={16} />
           </button>
         </header>
-        <div className="rack-body">{content}</div>
+        <div className="rack-body">
+          <Suspense fallback={<PanelSkeleton />}>{content}</Suspense>
+        </div>
       </div>
     </aside>
   )
 }
+
+export default RackDock

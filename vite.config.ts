@@ -18,5 +18,14 @@ export default defineConfig({
   build: {
     target: 'chrome110',
     sourcemap: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          react: ['react', 'react/jsx-runtime', 'react-dom', 'react-dom/client'],
+          lucide: ['lucide-react'],
+          vendor: ['zustand', 'clsx', '@tauri-apps/plugin-updater'],
+        },
+      },
+    },
   },
 })

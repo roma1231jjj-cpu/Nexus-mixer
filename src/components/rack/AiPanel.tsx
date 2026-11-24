@@ -441,3 +441,5 @@ export function AiPanel() {
     </>
   )
 }
+
+export default AiPanel
