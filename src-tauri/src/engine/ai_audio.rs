@@ -176,6 +176,15 @@ impl AiAudioState {
         f32::from_bits(self.source_db.load(Ordering::Relaxed))
     }
 
+    /// Discard one buffered wet frame. Called instead of [`Self::process`] while
+    /// the source strip is not audible, so a muted strip never reaches the
+    /// sidecar and stale wet audio cannot play back after unmuting.
+    pub fn skip_frame(&self) {
+        if self.wet.available_read() >= 2 {
+            let _ = self.wet.pop_frame_or_silence();
+        }
+    }
+
     /// Mix one source frame into the bus graph through the AI path. Returns the
     /// frame the mixer should route onwards. Without a source slot, with the AI
     /// path disabled, or when the wet ring has no audio yet, the dry frame is
@@ -413,18 +422,19 @@ fn run_ai(
         }
 
         let chunk_frames = params.chunk_frames.max(1) as usize;
-        if scratch.len() < chunk_frames * 2 + 4 {
-            scratch.resize(chunk_frames * 2 + 4, 0.0);
+        let needed_frames = chunk_frames.saturating_sub(buffer.len());
+        if scratch.len() < needed_frames * 2 {
+            scratch.resize(needed_frames * 2, 0.0);
         }
 
         while buffer.len() < chunk_frames {
-            let read = dry.pop_slice(&mut scratch[..chunk_frames * 2]);
-            if read == 0 {
+            let want = (chunk_frames - buffer.len()) * 2;
+            let read = dry.pop_slice(&mut scratch[..want]);
+            if read < 2 {
                 break;
             }
             for index in 0..read / 2 {
-                buffer.push(scratch[index * 2]);
-                buffer.push(scratch[index * 2 + 1]);
+                buffer.push((scratch[index * 2] + scratch[index * 2 + 1]) * 0.5);
             }
         }
 
@@ -472,7 +482,7 @@ fn run_ai(
                             payload[3],
                         ]);
                         if response_seq == sent_seq {
-                            let mut index = 0usize;
+                            let mut index = 4usize;
                             let mut mix_value = f32::from_bits(mix.load(Ordering::Relaxed));
                             while index + 4 <= payload.len() {
                                 let sample = f32::from_le_bytes([

@@ -96,24 +96,29 @@ export const useUpdater = create<UpdaterState>((set, get) => ({
 
   download: async () => {
     if (!pending) return
+    bytes = 0
+    total = 0
     set({ status: 'downloading', progress: 0, error: null })
     try {
       await pending.download((event) => {
         if (event.event === 'Started') {
+          bytes = 0
           total = event.data.contentLength ?? 0
           set({ progress: 0 })
         } else if (event.event === 'Progress') {
           bytes += event.data.chunkLength
           const percent = total > 0 ? Math.min(99, Math.round((bytes / total) * 100)) : 0
           set({ progress: percent })
-        } else {
+        } else if (event.event === 'Finished') {
           set({ status: 'ready', progress: 100 })
         }
       })
       // `download` resolves after Finished; keep ready if the event was missed.
       if (get().status === 'downloading') set({ status: 'ready', progress: 100 })
     } catch (error) {
-      set({ status: 'error', error: error instanceof Error ? error.message : String(error) })
+      bytes = 0
+      total = 0
+      set({ status: 'error', progress: 0, error: error instanceof Error ? error.message : String(error) })
     }
   },
 

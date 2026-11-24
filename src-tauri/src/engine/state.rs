@@ -1,4 +1,5 @@
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::Arc;
 
 use parking_lot::{Mutex, RwLock};
 use serde_json::Value;
@@ -23,7 +24,7 @@ pub struct EngineState {
     xruns: AtomicU64,
     cpu_milli: AtomicU64,
     driver: RwLock<DriverStatus>,
-    ai: AiClient,
+    ai: Arc<AiClient>,
 }
 
 impl Default for EngineState {
@@ -43,7 +44,7 @@ impl EngineState {
             xruns: AtomicU64::new(0),
             cpu_milli: AtomicU64::new(0),
             driver: RwLock::new(DriverStatus::default()),
-            ai: AiClient::new(),
+            ai: Arc::new(AiClient::new()),
         }
     }
 
@@ -74,7 +75,8 @@ impl EngineState {
             return Ok(runtime.info().clone());
         }
 
-        let runtime = EngineRuntime::start(&config, &snapshot).map_err(|error| format!("{error:#}"))?;
+        let runtime = EngineRuntime::start(&config, &snapshot, Arc::clone(&self.ai))
+            .map_err(|error| format!("{error:#}"))?;
         let info = runtime.info().clone();
         self.set_config(config);
         let mut guard = self.runtime.lock();
@@ -156,8 +158,10 @@ impl EngineState {
         self.running.load(Ordering::Acquire)
     }
 
-    /// Control-plane client for the local Voice AI sidecar.
-    pub fn ai(&self) -> &AiClient {
+    /// Control-plane client for the local Voice AI sidecar. The realtime AI path
+    /// shares this exact instance, so the UI and the audio thread use one
+    /// connection.
+    pub fn ai(&self) -> &Arc<AiClient> {
         &self.ai
     }
 

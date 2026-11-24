@@ -49,9 +49,6 @@ function normalizeDevices(devices: AudioDevice[]): void {
       .map((device) => cableIndex(device.name))
       .filter((index): index is number => index !== null),
   )
-  const hasAllCables = Array.from({ length: 12 }, (_, i) => i + 1).every((index) =>
-    virtualOutputs.some((device) => cableIndex(device.name) === index),
-  )
   // Installs that predate VAC have bus Bn pointed at an arbitrary cable. Bind
   // Bn -> Nexus Cable Bn once, then leave manual remapping alone.
   let remapCables = false
@@ -180,7 +177,16 @@ function normalizeDevices(devices: AudioDevice[]): void {
     // A2/A3 are spare physical outputs. They caused constant underruns when
     // auto-pointed at a sleeping USB/Bluetooth endpoint; open them only when
     // the user explicitly assigns a device.
-    if ((id === 'A2' || id === 'A3') && !bus.deviceId) continue
+    if (id === 'A2' || id === 'A3') {
+      if (!bus.deviceId) continue
+      if (!known.has(bus.deviceId)) {
+        buses[id as BusId] = { ...bus, deviceId: '' }
+        busesChanged = true
+        continue
+      }
+      usedOutputs.add(bus.deviceId)
+      continue
+    }
 
     const pool = physicalOutputs
     const forceMaster = remapCables && id === 'A1'
@@ -215,7 +221,7 @@ function normalizeDevices(devices: AudioDevice[]): void {
 
   if (stripsChanged) useMixer.setState({ strips })
   if (busesChanged) useMixer.setState({ buses })
-  if (remapCables && hasAllCables) {
+  if (remapCables && numberedCables.size > 0) {
     try {
       localStorage.setItem(CABLE_PLAN_KEY, '1')
     } catch {

@@ -237,4 +237,7 @@ export const rack: Rack = {
   'pad.master': 'Master',
   'seq.lanes': 'Lanes',
   'seq.step': 'Step',
+  'seq.bpm': 'BPM',
+  'seq.title': 'Step Sequencer',
+  'seq.play': 'Start the sequencer',
 }

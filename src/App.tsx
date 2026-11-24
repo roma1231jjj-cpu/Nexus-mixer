@@ -33,6 +33,13 @@ const isTyping = (target: EventTarget | null): boolean => {
   return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable
 }
 
+const shortcutCode = (key: string): string => {
+  if (/^[0-9]$/.test(key)) return `Digit${key}`
+  if (/^[a-z]$/.test(key)) return `Key${key.toUpperCase()}`
+  if (/^f([1-9]|1[0-2])$/.test(key)) return key.toUpperCase()
+  return ''
+}
+
 const matchesShortcut = (event: KeyboardEvent, shortcut: string): boolean => {
   const parts = shortcut
     .toLowerCase()
@@ -45,7 +52,10 @@ const matchesShortcut = (event: KeyboardEvent, shortcut: string): boolean => {
   const needShift = parts.includes('shift')
   const needAlt = parts.includes('alt')
   const sameModifiers = event.ctrlKey === needCtrl && event.shiftKey === needShift && event.altKey === needAlt
-  return sameModifiers && event.key.toLowerCase() === key
+  if (!sameModifiers) return false
+  const code = shortcutCode(key)
+  if (code) return event.code === code
+  return event.key.toLowerCase() === key
 }
 
 export default function App() {
@@ -157,21 +167,22 @@ export default function App() {
         useUi.getState().notify(translate(lang, 'app.presetSaved'))
         return
       }
-      if (event.key.toLowerCase() === 'c') {
-        const state = useMixer.getState()
-        state.setMatrixOpen(!state.matrixOpen)
-        return
-      }
-      if (event.key.toLowerCase() === 'r') {
-        useUi.getState().openRack('ai')
-        return
-      }
       for (const macro of macros) {
         if (macro.shortcut && matchesShortcut(event, macro.shortcut)) {
           event.preventDefault()
           runMacro(macro.id)
           return
         }
+      }
+      if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return
+      if (event.code === 'KeyC') {
+        const state = useMixer.getState()
+        state.setMatrixOpen(!state.matrixOpen)
+        return
+      }
+      if (event.code === 'KeyR') {
+        useUi.getState().openRack('ai')
+        return
       }
     }
     window.addEventListener('keydown', onKeyDown)

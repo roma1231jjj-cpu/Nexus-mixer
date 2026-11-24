@@ -1,7 +1,8 @@
+import { memo } from 'react'
 import type { EqBand } from '../../types'
 import { eqPath } from '../../lib/eqCurve'
 
-export function EqMini({
+const EqMiniInner = function EqMini({
   bands,
   color,
   sampleRate,
@@ -42,3 +43,5 @@ export function EqMini({
     </div>
   )
 }
+
+export const EqMini = memo(EqMiniInner)

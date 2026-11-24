@@ -137,7 +137,11 @@ export function playSample(
   panner.connect(destNode)
 
   // Start playback
-  source.start(0, params.startOffset ?? 0)
+  const rawOffset = params.startOffset ?? 0
+  const offset = Number.isFinite(rawOffset)
+    ? Math.min(Math.max(rawOffset, 0), buffer.duration)
+    : 0
+  source.start(0, offset)
 
   return { gainNode: gain, sourceNode: source }
 }

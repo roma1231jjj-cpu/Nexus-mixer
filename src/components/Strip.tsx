@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { Mic, Music2, Globe, Monitor, Gamepad2, AudioLines } from 'lucide-react'
 import { useMixer } from '../store/useMixer'
 import { useUi } from '../store/useUi'
@@ -35,31 +35,54 @@ export function Strip({ id }: { id: StripId }) {
   const selectStrip = useMixer((s) => s.selectStrip)
   const openRack = useUi((s) => s.openRack)
   const devices = useMixer((s) => s.devices)
+  const sourceCount = useMixer((s) => s.sourceCount)
+  const sliderRef = useRef<HTMLInputElement>(null)
+  const gainRef = useRef(strip.gainDb)
+  gainRef.current = strip.gainDb
+
+  useEffect(() => {
+    const el = sliderRef.current
+    if (!el) return
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault()
+      const delta = event.deltaY < 0 ? 0.5 : -0.5
+      const next = Math.min(FADER_MAX, Math.max(FADER_MIN, Math.round((gainRef.current + delta) * 10) / 10))
+      if (next !== gainRef.current) setStrip(id, { gainDb: next })
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [id, setStrip])
 
   const handleStripClick = useCallback((e: React.MouseEvent) => {
+    const visible = STRIP_ORDER.slice(0, sourceCount)
+    if (!visible.includes(id)) return
     if (e.ctrlKey || e.metaKey) {
       const current = useMixer.getState().multiSelectedStripIds
       if (current.includes(id)) {
         useMixer.getState().setMultiSelectedStripIds(current.filter((sid) => sid !== id))
       } else {
-        useMixer.getState().setMultiSelectedStripIds([...current, id])
+        useMixer.getState().setMultiSelectedStripIds([...current.filter((sid) => visible.includes(sid)), id])
       }
       e.stopPropagation()
     } else if (e.shiftKey && useMixer.getState().multiSelectedStripIds.length > 0) {
       const currentSelected = useMixer.getState().multiSelectedStripIds
       const lastSelected = currentSelected[currentSelected.length - 1]
-      const allStrips = STRIP_ORDER
-      const lastIdx = allStrips.indexOf(lastSelected)
-      const thisIdx = allStrips.indexOf(id)
+      const lastIdx = visible.indexOf(lastSelected)
+      const thisIdx = visible.indexOf(id)
+      if (lastIdx < 0 || thisIdx < 0) {
+        useMixer.getState().setMultiSelectedStripIds([id])
+        e.stopPropagation()
+        return
+      }
       const from = Math.min(lastIdx, thisIdx)
       const to = Math.max(lastIdx, thisIdx)
-      useMixer.getState().setMultiSelectedStripIds(allStrips.slice(from, to + 1))
+      useMixer.getState().setMultiSelectedStripIds(visible.slice(from, to + 1))
       e.stopPropagation()
     } else {
       useMixer.getState().clearMultiSelection()
       selectStrip(id)
     }
-  }, [id, selectStrip])
+  }, [id, selectStrip, sourceCount])
 
   const index = STRIP_ORDER.indexOf(id)
   // Show the input meter even while muted: it is a gain-staging aid, and a
@@ -142,14 +165,9 @@ export function Strip({ id }: { id: StripId }) {
             ))}
           </div>
           <div className="strip-track">
-            <input type="range" className="strip-slider" min={FADER_MIN} max={FADER_MAX} step={0.5}
+            <input type="range" className="strip-slider" ref={sliderRef} min={FADER_MIN} max={FADER_MAX} step={0.5}
               value={strip.gainDb} data-tip={t('strip.volumeTip', { level: dbLabel(strip.gainDb) })}
-              onChange={(e) => setStrip(id, { gainDb: parseFloat(e.target.value) })}
-              onWheel={(e) => {
-                e.preventDefault()
-                const delta = e.deltaY < 0 ? 0.5 : -0.5
-                setStrip(id, { gainDb: Math.min(FADER_MAX, Math.max(FADER_MIN, strip.gainDb + delta)) })
-              }} />
+              onChange={(e) => setStrip(id, { gainDb: parseFloat(e.target.value) })} />
           </div>
         </div>
 

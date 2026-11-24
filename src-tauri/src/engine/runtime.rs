@@ -75,6 +75,7 @@ pub struct RuntimeInfo {
     pub input_streams: usize,
     pub output_streams: usize,
     pub warnings: Vec<String>,
+    pub buffer_fallback: bool,
 }
 
 impl RuntimeInfo {
@@ -104,8 +105,14 @@ pub struct EngineRuntime {
 impl EngineRuntime {
     /// Build the streams on a dedicated thread and wait until they are playing.
     ///
-    /// `snapshot` is the JSON published by the UI (`MixerParams` shape).
-    pub fn start(config: &EngineConfig, snapshot: &serde_json::Value) -> Result<Self> {
+    /// `snapshot` is the JSON published by the UI (`MixerParams` shape). `ai` is
+    /// the control-plane client shared with the UI, so the realtime AI path and
+    /// the AI panel talk through one connection.
+    pub fn start(
+        config: &EngineConfig,
+        snapshot: &serde_json::Value,
+        ai: Arc<AiClient>,
+    ) -> Result<Self> {
         let params: MixerParams = if snapshot.is_null() {
             MixerParams::default()
         } else {
@@ -125,7 +132,7 @@ impl EngineRuntime {
         let ai_engine = AiEngine::spawn(
             dry_ai.clone(),
             wet_ai.clone(),
-            Arc::new(AiClient::new()),
+            ai,
             ai_params,
             config.sample_rate,
         );
@@ -191,7 +198,7 @@ impl EngineRuntime {
                 // The thread may still be probing a stuck endpoint. Dropping the
                 // sender makes its `recv()` return immediately once it gets there.
                 drop(stop_tx);
-                Err(anyhow!("audio engine did not start within 20 seconds"))
+                Err(anyhow!("audio engine did not start within 45 seconds"))
             }
         }
     }
@@ -394,7 +401,7 @@ fn build_output_stream<F>(
     supported: &SupportedStreamConfig,
     buffer_size: u32,
     mut make_callback: F,
-) -> Result<Stream>
+) -> Result<(Stream, bool)>
 where
     F: FnMut() -> Box<dyn FnMut(&mut [f32], &OutputCallbackInfo) + Send>,
 {
@@ -402,14 +409,15 @@ where
     config.buffer_size = BufferSize::Fixed(buffer_size.max(32));
 
     // WASAPI shared mode occasionally rejects a fixed buffer. Retry with the
-    // device-managed size; the UI still reports the requested value.
+    // device-managed size and report the fallback so the engine can warn.
     if let Ok(stream) = device.build_output_stream(&config, make_callback(), stream_error, None) {
-        return Ok(stream);
+        return Ok((stream, false));
     }
 
     config.buffer_size = BufferSize::Default;
     device
         .build_output_stream(&config, make_callback(), stream_error, None)
+        .map(|stream| (stream, true))
         .map_err(|error| anyhow!("output stream: {error}"))
 }
 
@@ -834,6 +842,18 @@ fn build_engine(
         Box::new(move |data: &mut [f32], _: &OutputCallbackInfo| renderer.process(data))
     })
     .with_context(|| format!("не удалось открыть выход «{}»", master.name))?;
+    let (master_stream, mut buffer_fallback) = master_stream;
+    if buffer_fallback {
+        tracing::warn!(
+            bus = BUS_IDS[master_bus],
+            buffer_size,
+            "master rejected the fixed WASAPI buffer — using the system size"
+        );
+        warnings.push(format!(
+            "{}: WASAPI отклонил буфер {buffer_size} кадров — используется системный размер (задержка может отличаться)",
+            BUS_IDS[master_bus]
+        ));
+    }
 
     master_stream
         .play()
@@ -855,6 +875,19 @@ fn build_engine(
             Box::new(move |data: &mut [f32], _: &OutputCallbackInfo| renderer.process(data))
         })
         .with_context(|| format!("не удалось открыть выход «{}»", output.name))?;
+        let (stream, fallback) = stream;
+        if fallback {
+            buffer_fallback = true;
+            tracing::warn!(
+                bus = BUS_IDS[output.bus],
+                buffer_size,
+                "output rejected the fixed WASAPI buffer — using the system size"
+            );
+            warnings.push(format!(
+                "{}: «{}» отклонил буфер {buffer_size} кадров — используется системный размер",
+                BUS_IDS[output.bus], output.name
+            ));
+        }
 
         stream
             .play()
@@ -880,6 +913,7 @@ fn build_engine(
         input_streams: input_streams.len(),
         output_streams: output_streams.len(),
         warnings,
+        buffer_fallback,
     };
 
     let mut streams = input_streams;
@@ -905,7 +939,8 @@ mod tests {
     #[ignore = "requires a real WASAPI output endpoint"]
     fn engine_starts_with_default_device() {
         let config = EngineConfig::default();
-        let runtime = EngineRuntime::start(&config, &serde_json::Value::Null).expect("engine start");
+        let runtime = EngineRuntime::start(&config, &serde_json::Value::Null, Arc::new(AiClient::new()))
+            .expect("engine start");
         assert!(runtime.info().output_streams >= 1);
         std::thread::sleep(Duration::from_millis(300));
         assert!(runtime.stats().frames() > 0, "master callback did not run");
@@ -958,7 +993,8 @@ mod tests {
             }
         });
 
-        let runtime = EngineRuntime::start(&config, &snapshot).expect("engine start");
+        let runtime = EngineRuntime::start(&config, &snapshot, Arc::new(AiClient::new()))
+            .expect("engine start");
         eprintln!(
             "streams: {} in / {} out; warnings: {:?}",
             runtime.info().input_streams,

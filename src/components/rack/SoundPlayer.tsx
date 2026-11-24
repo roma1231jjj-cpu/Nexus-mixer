@@ -54,6 +54,7 @@ export function SoundPlayer() {
   const [dragOver, setDragOver] = useState(false)
   const [seqOpen, setSeqOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const padStatesRef = useRef<Record<string, SoundPadState>>({})
 
   // Init AudioContext on first interaction
   const getAudioCtx = useCallback(() => {
@@ -71,15 +72,25 @@ export function SoundPlayer() {
     saveSamples(samples)
   }, [samples])
 
-  // Clean up on unmount
+  // Pads are read from a ref so cleanup and callbacks never depend on the
+  // current pad state (an effect that re-ran on every change used to close the
+  // shared AudioContext whenever a sample was added or re-routed).
+  useEffect(() => {
+    padStatesRef.current = padStates
+  }, [padStates])
+
+  // Clean up on unmount only
   useEffect(() => {
     return () => {
-      Object.values(padStates).forEach((ps) => {
+      Object.values(padStatesRef.current).forEach((ps) => {
+        if (!ps.playing) return
         try { ps.sourceNode?.stop() } catch { /* already stopped */ }
       })
-      audioCtxRef.current?.close()
+      const ctx = audioCtxRef.current
+      audioCtxRef.current = null
+      if (ctx && ctx.state !== 'closed') void ctx.close().catch(() => undefined)
     }
-  }, [padStates])
+  }, [])
 
   /* ────────── file upload ────────── */
 
@@ -189,7 +200,7 @@ export function SoundPlayer() {
   }
 
   const handleStopAll = () => {
-    Object.values(padStates).forEach((ps) => {
+    Object.values(padStatesRef.current).forEach((ps) => {
       if (ps.playing) {
         try { ps.sourceNode?.stop() } catch { /* ignore */ }
       }
@@ -533,9 +544,9 @@ export function SoundPlayer() {
                   if (idx >= 0) handlePlay(id)
                 }}
                 onStop={(id) => {
-                  const state = padStates[id]
+                  const state = padStatesRef.current[id]
                   if (state?.playing) {
-                    try { state.sourceNode?.stop() } catch {}
+                    try { state.sourceNode?.stop() } catch { /* ignore */ }
                     setPadStates((prev) => ({ ...prev, [id]: { playing: false, sourceNode: null, gainNode: null } }))
                   }
                 }}

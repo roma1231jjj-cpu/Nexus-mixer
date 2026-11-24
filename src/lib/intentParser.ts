@@ -300,7 +300,7 @@ const INTENTS: { words: string[]; changes: ParamChange[] }[] = [
 
   /* ─── Reset ─── */
   {
-    words: ['сброс', 'очист', 'reset', 'clear', 'default', 'начальн'],
+    words: ['сброс', 'очист', 'reset', 'default', 'начальн'],
     changes: [
       {
         descriptionKey: 'intent.reset',
@@ -343,8 +343,12 @@ export function parseIntent(text: string): ParsedIntent[] {
 
     // Check negation: if a negation word appears within 3 words before the keyword, skip it.
     const wordIndex = lower.indexOf(matchedWord)
-    const before = lower.slice(Math.max(0, wordIndex - 30), wordIndex)
-    const isNegated = NEGATIONS.some((neg) => before.includes(neg))
+    const before = lower
+      .slice(0, wordIndex)
+      .split(/[^\p{L}\p{N}]+/u)
+      .filter(Boolean)
+      .slice(-3)
+    const isNegated = before.some((word) => NEGATIONS.includes(word))
     if (isNegated) continue
 
     results.push({

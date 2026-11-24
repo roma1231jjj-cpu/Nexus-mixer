@@ -13,7 +13,21 @@ export interface SceneSnapshot {
   name: string
   /** ISO timestamp */
   savedAt: string
-  strips: Record<string, { gainDb: number; pan: number; mute: boolean; solo: boolean; mono: boolean; phase: boolean; voiceTiltDb: number; fx: StripFx; routing: Record<string, { on: boolean; levelDb: number }> }>
+  strips: Record<string, {
+    gainDb: number
+    pan: number
+    mute: boolean
+    solo: boolean
+    mono: boolean
+    phase: boolean
+    voiceTiltDb: number
+    fx: StripFx
+    routing: Record<string, { on: boolean; levelDb: number }>
+    /** Optional for snapshots created before cue/phantom/preset capture. */
+    cue?: boolean
+    phantom?: boolean
+    aiPresetId?: string | null
+  }>
   buses: Record<string, { gainDb: number; mute: boolean; mono: boolean; dim: boolean; fx: BusFx }>
   /** Optional for snapshots created before the master section existed. */
   masterEq?: EqBand[]
@@ -42,6 +56,9 @@ export function captureSnapshot(name: string, state: MixerStore): SceneSnapshot 
       voiceTiltDb: s.voiceTiltDb,
       fx: structuredClone(s.fx),
       routing: structuredClone(s.routing) as SceneSnapshot['strips'][string]['routing'],
+      cue: s.cue,
+      phantom: s.phantom,
+      aiPresetId: s.aiPresetId,
     }
   }
 
@@ -94,7 +111,7 @@ export function applySnapshot(
   for (const id of STRIP_ORDER) {
     const data = snapshot.strips[id]
     if (!data) continue
-    ctx.setStrip(id, {
+    const patch: Partial<Strip> = {
       gainDb: data.gainDb,
       pan: data.pan,
       mute: data.mute,
@@ -102,7 +119,13 @@ export function applySnapshot(
       mono: data.mono,
       phase: data.phase,
       voiceTiltDb: data.voiceTiltDb,
-    })
+    }
+    if (typeof data.cue === 'boolean') patch.cue = data.cue
+    if (typeof data.phantom === 'boolean') patch.phantom = data.phantom
+    if ('aiPresetId' in data) {
+      patch.aiPresetId = typeof data.aiPresetId === 'string' ? data.aiPresetId : null
+    }
+    ctx.setStrip(id, patch)
     ctx.setStripFx(id, structuredClone(data.fx) as StripFx)
 
     // Restore routing

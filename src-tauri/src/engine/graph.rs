@@ -1103,24 +1103,30 @@ impl MixerGraph {
                 out_left = wet_left;
                 out_right = wet_right;
             }
+            let (mute, solo, routing) = (strip.mute, strip.solo, strip.routing);
+            let audible = !(mute || (self.solo_active && !solo));
+
             if self.ai_source == Some(index) {
                 if let Some(ai) = self.ai.as_ref() {
-                    if ai.gate.load(std::sync::atomic::Ordering::Acquire) {
-                        let _ = ai.dry.push_slice(&[out_left, out_right]);
-                        let (left, right) = ai.process(Some(index), out_left, out_right);
-                        out_left = left;
-                        out_right = right;
+                    if ai.gate.load(Ordering::Acquire) {
+                        if audible {
+                            let _ = ai.dry.push_slice(&[out_left, out_right]);
+                            let (left, right) = ai.process(Some(index), out_left, out_right);
+                            out_left = left;
+                            out_right = right;
+                        } else {
+                            ai.skip_frame();
+                        }
                     }
                 }
             }
-            let (mute, solo, routing) = (strip.mute, strip.solo, strip.routing);
 
             let peak = out_left.abs().max(out_right.abs());
             if peak > self.strip_peak[index] {
                 self.strip_peak[index] = peak;
             }
 
-            if mute || (self.solo_active && !solo) {
+            if !audible {
                 continue;
             }
 

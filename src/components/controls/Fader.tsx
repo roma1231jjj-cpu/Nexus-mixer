@@ -1,5 +1,5 @@
 import {
-  useRef, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react'
+  useEffect, useRef, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react'
 import { FADER_MAX, FADER_MIN, clamp } from '../../lib/format'
 import { t } from '../../i18n'
 
@@ -27,9 +27,27 @@ export function Fader({
   hint,
 }: FaderProps) {
   const ref = useRef<HTMLDivElement>(null)
+  const valueRef = useRef(value)
+  const onChangeRef = useRef(onChange)
+  valueRef.current = value
+  onChangeRef.current = onChange
   const position = ((clamp(value, min, max) - min) / (max - min)) * 100
   const commit = (next: number) => onChange(clamp(Math.round(next * 10) / 10, min, max))
   const tickPosition = (tick: number) => ((clamp(tick, min, max) - min) / (max - min)) * 100
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault()
+      const step = event.shiftKey ? 2 : 0.5
+      const direction = event.deltaY < 0 ? 1 : -1
+      const next = clamp(Math.round((valueRef.current + direction * step) * 10) / 10, min, max)
+      if (next !== valueRef.current) onChangeRef.current(next)
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [min, max])
 
   const updateFromPointer = (event: PointerEvent<HTMLDivElement>) => {
     const el = ref.current

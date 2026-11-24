@@ -93,31 +93,33 @@ export function useUndoRedoIntegration() {
     }
   }, [])
 
-  const handleUndo = useCallback(() => {
+  const flushPending = useCallback(() => {
     if (timerRef.current) {
       window.clearTimeout(timerRef.current)
       timerRef.current = null
     }
+    const pending = pendingRef.current
     pendingRef.current = null
+    if (pending) capture(pending)
+  }, [capture])
+
+  const handleUndo = useCallback(() => {
+    flushPending()
     const current = currentSnapshot()
     const snapshot = undo(current.stripFx, current.busFx)
     if (!snapshot) return false
     applySnapshot(snapshot)
     return true
-  }, [undo, currentSnapshot, applySnapshot])
+  }, [flushPending, undo, currentSnapshot, applySnapshot])
 
   const handleRedo = useCallback(() => {
-    if (timerRef.current) {
-      window.clearTimeout(timerRef.current)
-      timerRef.current = null
-    }
-    pendingRef.current = null
+    flushPending()
     const current = currentSnapshot()
     const snapshot = redo(current.stripFx, current.busFx)
     if (!snapshot) return false
     applySnapshot(snapshot)
     return true
-  }, [redo, currentSnapshot, applySnapshot])
+  }, [flushPending, redo, currentSnapshot, applySnapshot])
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -137,5 +139,5 @@ export function useUndoRedoIntegration() {
     return () => window.removeEventListener('keydown', handler)
   }, [handleUndo, handleRedo])
 
-  return { handleUndo, handleRedo, canUndo, canRedo }
+  return { handleUndo, handleRedo, flushPending, canUndo, canRedo }
 }

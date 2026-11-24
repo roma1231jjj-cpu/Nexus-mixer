@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Plus, Trash2, Zap } from 'lucide-react'
 import type { MacroAction } from '../../types'
 import { useMixer } from '../../store/useMixer'
@@ -27,6 +27,22 @@ export function MacroPanel() {
   const removeMacro = useMixer((s) => s.removeMacro)
   const notify = useUi((s) => s.notify)
   const [pressed, setPressed] = useState<string | null>(null)
+  const pressedRef = useRef<string | null>(null)
+
+  const beginHold = (id: string, label: string) => {
+    if (pressedRef.current) return
+    pressedRef.current = id
+    setPressed(id)
+    runMacro(id)
+    notify(t('macro.holdToast', { label }))
+  }
+
+  const endHold = (id: string) => {
+    if (pressedRef.current !== id) return
+    pressedRef.current = null
+    setPressed(null)
+    runMacro(id)
+  }
 
   return (
     <>
@@ -42,21 +58,29 @@ export function MacroPanel() {
             type="button"
             className={`macro-card${pressed === macro.id ? ' pressed' : ''}`}
             style={{ '--macro-color': macro.color } as React.CSSProperties}
-            onPointerDown={() => {
+            onPointerDown={(event) => {
               if (!macro.momentary) return
-              setPressed(macro.id)
-              runMacro(macro.id)
-              notify(t('macro.holdToast', { label: macro.label }))
+              event.currentTarget.setPointerCapture(event.pointerId)
+              beginHold(macro.id, macro.label)
             }}
-            onPointerUp={() => {
-              if (!macro.momentary || pressed !== macro.id) return
-              setPressed(null)
-              runMacro(macro.id)
+            onPointerUp={(event) => {
+              if (!macro.momentary) return
+              if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+                event.currentTarget.releasePointerCapture(event.pointerId)
+              }
+              endHold(macro.id)
             }}
-            onPointerLeave={() => {
-              if (!macro.momentary || pressed !== macro.id) return
-              setPressed(null)
-              runMacro(macro.id)
+            onPointerCancel={(event) => {
+              if (!macro.momentary) return
+              if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+                event.currentTarget.releasePointerCapture(event.pointerId)
+              }
+              endHold(macro.id)
+            }}
+            onPointerLeave={(event) => {
+              if (!macro.momentary) return
+              if (event.currentTarget.hasPointerCapture(event.pointerId)) return
+              endHold(macro.id)
             }}
             onClick={() => {
               if (macro.momentary) return
@@ -137,15 +161,26 @@ export function MacroPanel() {
               ) : null}
 
               {macro.action.type === 'preset' ? (
-                <Select
-                  value={typeof macro.action.value === 'string' ? macro.action.value : ''}
-                  options={[
-                    { value: '', label: t('macro.presetOption') },
-                    ...presets.map((preset) => ({ value: preset.id, label: preset.name })),
-                  ]}
-                  onChange={(val) => updateMacro(macro.id, { action: { ...macro.action, value: val } })}
-                  small
-                />
+                <>
+                  <Select
+                    value={typeof macro.action.value === 'string' ? macro.action.value : ''}
+                    options={[
+                      { value: '', label: t('macro.presetOption') },
+                      ...presets.map((preset) => ({ value: preset.id, label: preset.name })),
+                    ]}
+                    onChange={(val) => updateMacro(macro.id, { action: { ...macro.action, value: val } })}
+                    small
+                  />
+                  <Select
+                    value={macro.action.target ?? ''}
+                    options={[
+                      { value: '', label: t('macro.channelOption') },
+                      ...STRIP_ORDER.map((id) => ({ value: id, label: strips[id].name })),
+                    ]}
+                    onChange={(val) => updateMacro(macro.id, { action: { ...macro.action, target: val as typeof macro.action.target } })}
+                    small
+                  />
+                </>
               ) : null}
 
               {macro.action.type === 'gain' ? (

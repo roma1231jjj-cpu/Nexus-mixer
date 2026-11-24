@@ -1,3 +1,5 @@
+export const STEPS = 16
+
 export interface StepSequencerState {
   running: boolean
   bpm: number
@@ -22,11 +24,13 @@ export function toggleStep(
   sampleId: string,
   stepIndex: number,
 ): StepSequencerState {
-  const lanes = state.pattern[sampleId] ?? Array(16).fill(false)
-  lanes[stepIndex] = !lanes[stepIndex]
+  const lanes = state.pattern[sampleId] ?? []
+  const next = Array.from({ length: STEPS }, (_, index) => Boolean(lanes[index]))
+  const step = ((stepIndex % STEPS) + STEPS) % STEPS
+  next[step] = !next[step]
   return {
     ...state,
-    pattern: { ...state.pattern, [sampleId]: [...lanes] },
+    pattern: { ...state.pattern, [sampleId]: next },
   }
 }
 
@@ -37,7 +41,7 @@ export function clearPattern(
   if (sampleId) {
     return {
       ...state,
-      pattern: { ...state.pattern, [sampleId]: Array(16).fill(false) },
+      pattern: { ...state.pattern, [sampleId]: Array(STEPS).fill(false) },
     }
   }
   return { ...state, pattern: {} }

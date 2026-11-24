@@ -233,8 +233,11 @@ export const rack = {
   'pad.loaded': 'Загружено {n} сэмплов',
   'pad.loopAria': 'Loop',
   'pad.master': 'Master',
-  'seq.lanes': 'Lanes',
-  'seq.step': 'Step',
+  'seq.lanes': 'Дорожки',
+  'seq.step': 'Шаг',
+  'seq.bpm': 'Темп',
+  'seq.title': 'Секвенсор',
+  'seq.play': 'Запустить секвенсор',
 }
 
 export type Rack = typeof rack

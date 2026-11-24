@@ -1,5 +1,5 @@
 import {
-  useRef, type CSSProperties, type PointerEvent } from 'react'
+  useEffect, useRef, type CSSProperties, type PointerEvent } from 'react'
 import { FADER_MAX, FADER_MIN, clamp } from '../../lib/format'
 import { t } from '../../i18n'
 
@@ -15,8 +15,26 @@ interface HFaderProps {
 
 export function HFader({ value, onChange, color, min = FADER_MIN, max = FADER_MAX, ariaLabel = t('tip.level'), hint }: HFaderProps) {
   const ref = useRef<HTMLDivElement>(null)
+  const valueRef = useRef(value)
+  const onChangeRef = useRef(onChange)
+  valueRef.current = value
+  onChangeRef.current = onChange
   const position = ((clamp(value, min, max) - min) / (max - min)) * 100
   const commit = (next: number) => onChange(clamp(Math.round(next * 10) / 10, min, max))
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault()
+      const step = event.shiftKey ? 2 : 0.5
+      const direction = event.deltaY > 0 ? 1 : -1
+      const next = clamp(Math.round((valueRef.current + direction * step) * 10) / 10, min, max)
+      if (next !== valueRef.current) onChangeRef.current(next)
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [min, max])
 
   const update = (event: PointerEvent<HTMLDivElement>) => {
     const el = ref.current

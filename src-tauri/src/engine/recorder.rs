@@ -462,7 +462,7 @@ impl WavWriter {
             return Err("не выбрано ни одной шины для записи".into());
         }
 
-        let base = unix_timestamp();
+        let base = unix_timestamp_ms();
         let suffix = if split_index == 0 {
             String::new()
         } else {
@@ -598,10 +598,10 @@ fn open_recording_file(
     Ok((file, path))
 }
 
-fn unix_timestamp() -> u64 {
+fn unix_timestamp_ms() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_secs())
+        .map(|duration| duration.as_millis() as u64)
         .unwrap_or(0)
 }
 
@@ -698,7 +698,7 @@ mod tests {
         let directory = std::env::temp_dir().join(format!(
             "nexus-recorder-test-{}-{}",
             std::process::id(),
-            unix_timestamp()
+            unix_timestamp_ms()
         ));
         let handle = RecorderHandle::new(48_000);
         let tap = handle.tap();

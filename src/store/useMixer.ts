@@ -254,6 +254,7 @@ export const useMixer = create<MixerStore>()(
         if (!preset) return
         const targetId = stripId ?? state.selectedStripId
         const strip = state.strips[targetId]
+        if (!strip) return
         const nextFx: StripFx = {
           gate: { ...strip.fx.gate, ...preset.fx.gate },
           compressor: { ...strip.fx.compressor, ...preset.fx.compressor },
@@ -267,7 +268,7 @@ export const useMixer = create<MixerStore>()(
             [targetId]: { ...strip, fx: nextFx, aiPresetId: preset.ai ? preset.id : null },
           },
           ai: preset.ai ? { ...state.ai, ...preset.ai } : state.ai,
-          selectedStripId: targetId,
+          ...(stripId ? {} : { selectedStripId: targetId }),
         })
       },
 
@@ -360,7 +361,7 @@ export const useMixer = create<MixerStore>()(
             break
           }
           case 'preset': {
-            if (typeof action.value === 'string') get().applyPreset(action.value)
+            if (typeof action.value === 'string') get().applyPreset(action.value, action.target)
             break
           }
           case 'ai': {
