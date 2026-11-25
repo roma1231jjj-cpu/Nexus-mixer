@@ -152,7 +152,9 @@ impl AiClient {
         let connection = guard
             .as_mut()
             .ok_or_else(|| "Sidecar не подключён".to_string())?;
-        let _ = connection.stream.set_read_timeout(Some(Duration::from_millis(400)));
+        let _ = connection
+            .stream
+            .set_read_timeout(Some(Duration::from_millis(400)));
         read_frame(&mut connection.stream)
     }
 
@@ -372,9 +374,7 @@ impl AiClient {
 
         let (kind, payload) = read_frame(&mut stream)?;
         if kind != KIND_JSON {
-            return Err(format!(
-                "Sidecar ответил кадром 0x{kind:02X} вместо JSON"
-            ));
+            return Err(format!("Sidecar ответил кадром 0x{kind:02X} вместо JSON"));
         }
         let message: Value = serde_json::from_slice(&payload)
             .map_err(|error| format!("Некорректный JSON handshake: {error}"))?;
@@ -403,15 +403,14 @@ impl AiClient {
                         sample_rate: message
                             .get("sample_rate")
                             .and_then(Value::as_u64)
-                            .unwrap_or(sample_rate as u64) as u32,
+                            .unwrap_or(sample_rate as u64)
+                            as u32,
                         chunk_frames: message
                             .get("chunk_frames")
                             .and_then(Value::as_u64)
-                            .unwrap_or(chunk_frames as u64) as u32,
-                        rtf: message
-                            .get("rtf")
-                            .and_then(Value::as_f64)
-                            .unwrap_or(1.0) as f32,
+                            .unwrap_or(chunk_frames as u64)
+                            as u32,
+                        rtf: message.get("rtf").and_then(Value::as_f64).unwrap_or(1.0) as f32,
                     },
                 ))
             }

@@ -122,7 +122,11 @@ impl AiRealtimeStats {
     fn note_rtf(&self, rtf: f32) {
         let milli = (rtf.clamp(0.0, 100.0) * 1_000.0) as u64;
         let previous = self.rtf_milli.load(Ordering::Relaxed);
-        let blended = if previous == 0 { milli } else { (previous * 3 + milli) / 4 };
+        let blended = if previous == 0 {
+            milli
+        } else {
+            (previous * 3 + milli) / 4
+        };
         self.rtf_milli.store(blended, Ordering::Relaxed);
     }
 }
@@ -475,12 +479,8 @@ fn run_ai(
             match ai.recv_event() {
                 Ok((KIND_AUDIO, payload)) => {
                     if payload.len() >= 4 && (payload.len() - 4) % 4 == 0 {
-                        let response_seq = u32::from_le_bytes([
-                            payload[0],
-                            payload[1],
-                            payload[2],
-                            payload[3],
-                        ]);
+                        let response_seq =
+                            u32::from_le_bytes([payload[0], payload[1], payload[2], payload[3]]);
                         if response_seq == sent_seq {
                             let mut index = 4usize;
                             let mut mix_value = f32::from_bits(mix.load(Ordering::Relaxed));
@@ -558,7 +558,10 @@ pub fn params_from_snapshot(value: &Value, sample_rate: u32) -> AiRuntimeParams 
         params.crossfade_frames = layout.crossfade_frames;
         params.pitch = ai.get("pitch").and_then(Value::as_f64).unwrap_or(0.0) as f32;
         params.formant = ai.get("formant").and_then(Value::as_f64).unwrap_or(0.0) as f32;
-        params.index_rate = ai.get("indexRate").and_then(Value::as_f64).unwrap_or(48_000.0) as f32;
+        params.index_rate = ai
+            .get("indexRate")
+            .and_then(Value::as_f64)
+            .unwrap_or(48_000.0) as f32;
         params.mix = ai.get("mix").and_then(Value::as_f64).unwrap_or(100.0) as f32 / 100.0;
         params.gate_db = ai.get("gateDb").and_then(Value::as_f64).unwrap_or(-55.0) as f32;
         params.max_backlog = MAX_BACKLOG;

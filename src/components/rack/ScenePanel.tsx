@@ -20,6 +20,8 @@ export function ScenePanel() {
   const setMasterEqEnabled = useMixer((s) => s.setMasterEqEnabled)
   const setMasterGainDb = useMixer((s) => s.setMasterGainDb)
   const setVcaGroups = useMixer((s) => s.setVcaGroups)
+  const setEngine = useMixer((s) => s.setEngine)
+  const setAi = useMixer((s) => s.setAi)
   const notify = useUi((s) => s.notify)
 
   const [scenes, setScenes] = useState<SceneSnapshot[]>(() => loadScenes())
@@ -31,7 +33,7 @@ export function ScenePanel() {
     const snap = captureSnapshot(n, state)
     const updated = [...scenes, snap]
     setScenes(updated)
-    saveScenes(updated)
+    if (!saveScenes(updated)) notify(t('scene.saveFailed'))
     setName('')
     notify(t('scene.saved', { name: n }))
   }
@@ -50,6 +52,8 @@ export function ScenePanel() {
       setMasterEqEnabled: setMasterEqEnabled as never,
       setMasterGainDb: setMasterGainDb as never,
       setVcaGroups: setVcaGroups as never,
+      setEngine: setEngine as never,
+      setAi: setAi as never,
     })
     notify(t('scene.loaded', { name: snap.name, count: details.length }))
   }

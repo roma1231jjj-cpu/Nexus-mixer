@@ -7,12 +7,12 @@ real-time voice effects.
 [Русская версия](README.md)
 
 [![Release](https://img.shields.io/github/v/release/roma1231jjj-cpu/Nexus-mixer?style=flat-square&label=release&color=8b5cf6)](https://github.com/roma1231jjj-cpu/Nexus-mixer/releases/latest)
-[![Tests](https://img.shields.io/badge/tests-54%20passed-2ea043?style=flat-square)](#tests)
+[![Tests](https://img.shields.io/badge/tests-101%20passed-2ea043?style=flat-square)](#tests)
 [![Windows](https://img.shields.io/badge/platform-Windows%2010%2F11-4b5563?style=flat-square)](#installation)
 [![Tauri](https://img.shields.io/badge/Tauri-2-24c8db?style=flat-square)](https://tauri.app)
 [![Rust](https://img.shields.io/badge/Rust-realtime-b7410e?style=flat-square)](https://www.rust-lang.org)
 
-> **Nexus × AutSquad** · v0.4.0 · Windows 10/11 x64 · Russian and English UI
+> **Nexus × AutSquad** · v0.5.0 · Windows 10/11 x64 · Russian and English UI
 
 Three themes in the English interface:
 
@@ -66,6 +66,34 @@ One console, three skins. Switch in the toolbar or in
 
 A theme is not just a colour swap: text contrast, borders, glow, faders, meters,
 device selectors and modal surfaces are rebuilt for each skin.
+
+---
+
+## What is new in 0.5.0
+
+- **PADS plays through the engine, not the browser.** A sample is uploaded to the
+  Rust bank and sounds through the selected strip, bus or master, including that
+  path's FX, EQ and pan. Sample files live in IndexedDB, so a restart keeps them;
+  a sample whose file is gone is marked "no file" and repaired with one button.
+- **The sequencer lands on the grid.** Steps are scheduled against audio time with
+  25 ms lookahead instead of a React timer; the pattern, BPM and swing persist.
+- **The recorder keeps its tail.** The queue is drained into the WAV before the
+  file closes, settings apply to the next session instead of the running one, and
+  hitting the RIFF limit rolls over into a new segment. An empty bus mask is an
+  error, not a silent recording into A1.
+- **Devices stop swapping places.** Duplicate names get a stable `#2` suffix, a
+  capture device with a different sample rate is resampled in the callback, and
+  I16/U16/I32/F64 formats are supported next to F32.
+- **Clocks stop drifting.** Input/output drift is compensated from ring fill
+  (±300 ppm), so a long take does not click.
+- **Undo/Redo and scenes cover everything:** faders, pan, mute/solo, routing,
+  names, FX, buses, master EQ, VCA, device assignments and the AI block.
+- **PANIC restores the previous state** instead of blanket-unmuting, and momentary
+  macros release correctly.
+- **Errors are visible.** Every engine call has its own result, start/stop can no
+  longer race, and the status reports the real buffer size.
+
+Full list — in [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
@@ -161,7 +189,9 @@ Updates are signed with a Tauri Updater key. The public key lives in
 - WAV recorder, 16/24/32-bit, with bus selection.
 - Macros and hotkeys.
 - MIDI Learn over Web MIDI.
-- Undo/Redo for FX.
+- Undo/Redo covers every mixer parameter: faders, pan, mute/solo, routing, names, FX, buses, master EQ and VCA.
+- Scenes keep channel names, device assignments, engine settings and the full AI block.
+- PADS (soundpad): samples play through the engine instead of Web Audio, so they pass through the selected strip, bus or master processing; sample files live in IndexedDB and survive a restart; the sequencer schedules steps against audio time and keeps its pattern.
 - State persistence, custom frameless title bar.
 - Deep links: `?tab=ai`, `?strip=hw1`, `?bus=B1`, `?theme=studio|dark|light`,
   `?drawer=settings`, `?lang=ru|en`.
@@ -250,6 +280,7 @@ pitch shifter.
 
 | Version | Highlights |
 | --- | --- |
+| **0.5.0** | engine-routed pads, loss-free recorder, device and clock-drift fixes, full undo/redo |
 | **0.4.0** | bilingual UI, Nexus-Studio / Nexus-Noir / Nexus-Frost, 3 delivery formats |
 | 0.3.1 | verified end-to-end auto-update |
 | 0.3.0 | local voices, updater, GitHub Releases |
@@ -271,8 +302,8 @@ pitch shifter.
 A release is created by a tag:
 
 ```powershell
-git tag v0.4.0
-git push origin v0.4.0
+git tag v0.5.0
+git push origin v0.5.0
 ```
 
 Repository secrets:

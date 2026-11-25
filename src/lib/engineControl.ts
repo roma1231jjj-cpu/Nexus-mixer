@@ -9,7 +9,7 @@
 import { publishMeterLevels } from '../audio/meterBus'
 import { t } from '../i18n'
 import { useMixer } from '../store/useMixer'
-import type { AiStatus, EngineStatus, RuntimeInfo } from '../types'
+import type { AiStatus, EngineStatus, RecorderStatus, RuntimeInfo } from '../types'
 import { engineBridge, getLastEngineError, snapshotOf } from './engineBridge'
 
 export interface EngineActionResult {
@@ -60,9 +60,10 @@ export async function connectAiSidecar(
   // Publish the current AI settings first so a fresh launch connects with the
   // chunk size the user actually selected instead of the default.
   await engineBridge.setMixerState(snapshotOf(useMixer.getState()))
-  const ai = await engineBridge.connectAi(config)
-  if (!ai) {
-    return { ok: false, error: getLastEngineError() ?? t('ai.connectError') }
+  const result = await engineBridge.callResult<AiStatus>('connect_ai_sidecar', { config })
+  const ai = result.value
+  if (!result.ok || !ai) {
+    return { ok: false, error: result.error ?? t('ai.connectError') }
   }
   applyAiStatus(ai)
   return { ok: true, ai }
@@ -72,9 +73,10 @@ export async function disconnectAiSidecar(): Promise<AiActionResult> {
   if (!engineBridge.available) {
     return { ok: false, error: t('ai.desktopOnly') }
   }
-  const ai = await engineBridge.disconnectAi()
-  if (!ai) {
-    return { ok: false, error: getLastEngineError() ?? t('ai.disconnectError') }
+  const result = await engineBridge.callResult<AiStatus>('disconnect_ai_sidecar')
+  const ai = result.value
+  if (!result.ok || !ai) {
+    return { ok: false, error: result.error ?? t('ai.disconnectError') }
   }
   applyAiStatus(ai)
   return { ok: true, ai }
@@ -106,15 +108,18 @@ export async function startEngine(): Promise<EngineActionResult> {
   // Always publish the freshest snapshot first: `start_engine` builds the
   // device graph from the last snapshot received by Rust.
   await engineBridge.setMixerState(snapshotOf(useMixer.getState()))
-  const status = await engineBridge.start()
-  if (!status) {
-    return { ok: false, error: getLastEngineError() ?? t('engine.startFailed') }
+  // Errors travel with the call: a background status poll can no longer wipe
+  // the message before it is read.
+  const result = await engineBridge.callResult<EngineStatus>('start_engine')
+  if (!result.ok || !result.value) {
+    return { ok: false, error: result.error ?? t('engine.startFailed') }
   }
+  const status = result.value
 
   applyEngineStatus(status)
   const info = await refreshEngineInfo()
-  const recorder = await engineBridge.getRecorderStatus()
-  useMixer.getState().setRecorderStatus(recorder)
+  const recorder = await engineBridge.callResult<RecorderStatus>('get_recorder_status')
+  useMixer.getState().setRecorderStatus(recorder.ok ? recorder.value : null)
   return { ok: true, status, info }
 }
 
@@ -123,10 +128,11 @@ export async function stopEngine(): Promise<EngineActionResult> {
     return { ok: false, error: t('engine.desktopOnly') }
   }
 
-  const status = await engineBridge.stop()
-  if (!status) {
-    return { ok: false, error: getLastEngineError() ?? t('engine.stopFailed') }
+  const result = await engineBridge.callResult<EngineStatus>('stop_engine')
+  if (!result.ok || !result.value) {
+    return { ok: false, error: result.error ?? t('engine.stopFailed') }
   }
+  const status = result.value
 
   applyEngineStatus(status)
   useMixer.getState().setRuntimeInfo(null)
@@ -145,7 +151,12 @@ export async function restartEngine(): Promise<EngineActionResult> {
     return { ok: false, error: t('engine.desktopOnly') }
   }
 
-  await engineBridge.stop()
+  const stopped = await engineBridge.callResult<EngineStatus>('stop_engine')
+  if (!stopped.ok) {
+    // Starting on top of a graph that refused to stop would either fail or
+    // leave two runtimes fighting for the same endpoints.
+    return { ok: false, error: stopped.error ?? t('engine.stopFailed') }
+  }
   useMixer.getState().setRuntimeInfo(null)
   useMixer.getState().setRecorderStatus(null)
   publishMeterLevels(null)

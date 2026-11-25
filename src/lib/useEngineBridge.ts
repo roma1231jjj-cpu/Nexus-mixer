@@ -104,20 +104,33 @@ function normalizeDevices(devices: AudioDevice[]): void {
       continue
     }
 
-    // Each source gets its own endpoint. Reusing one capture endpoint on two
-    // strips would open the same stream twice and multiply the signal.
-    const pool = id === 'vaio' || id === 'aux' ? virtualInputs : physicalInputs
-    const preferred = id === 'hw1' ? pool.find((d) => d.isDefault) : undefined
-    let next = ''
-    if (preferred && !usedInputs.has(preferred.id)) {
-      usedInputs.add(preferred.id)
-      next = preferred.id
-    } else {
-      next = take(pool, usedInputs)
+    // A device that is currently unplugged keeps its assignment: replacing it
+    // with "some other free endpoint" silently moved a microphone to the wrong
+    // channel, and the original never came back on replug. The engine reports
+    // the missing endpoint as a warning instead.
+    if (strip.deviceId && known.has(strip.deviceId) === false) continue
+
+    // An empty assignment is a deliberate choice ("this channel is off").
+    // Only the first-run migration fills it in; the old code repopulated every
+    // empty slot on each device refresh.
+    if (!strip.deviceId) {
+      const pool = id === 'vaio' || id === 'aux' ? virtualInputs : physicalInputs
+      const preferred = remapCables
+        ? id === 'hw1'
+          ? pool.find((device) => device.isDefault)
+          : undefined
+        : undefined
+      if (preferred && !usedInputs.has(preferred.id)) {
+        usedInputs.add(preferred.id)
+        strips[id] = { ...strip, deviceId: preferred.id }
+        stripsChanged = true
+      }
+      continue
     }
 
-    strips[id] = { ...strip, deviceId: next }
-    stripsChanged = true
+    // The id exists but a higher-priority slot already claimed it (duplicate
+    // assignment). Leave it alone rather than stealing another endpoint.
+    continue
   }
 
   let busesChanged = false
@@ -167,10 +180,8 @@ function normalizeDevices(devices: AudioDevice[]): void {
         }
       }
 
-      if (bus.deviceId && !known.has(bus.deviceId)) {
-        buses[id as BusId] = { ...bus, deviceId: '' }
-        busesChanged = true
-      }
+      // Keep the assignment of a temporarily missing cable so it reconnects
+      // where it was; the engine surfaces it as "device not found".
       continue
     }
 
@@ -179,11 +190,7 @@ function normalizeDevices(devices: AudioDevice[]): void {
     // the user explicitly assigns a device.
     if (id === 'A2' || id === 'A3') {
       if (!bus.deviceId) continue
-      if (!known.has(bus.deviceId)) {
-        buses[id as BusId] = { ...bus, deviceId: '' }
-        busesChanged = true
-        continue
-      }
+      if (!known.has(bus.deviceId)) continue
       usedOutputs.add(bus.deviceId)
       continue
     }
@@ -198,6 +205,11 @@ function normalizeDevices(devices: AudioDevice[]): void {
     // Prefer a 48 kHz output for A1 while migrating: a 44.1 kHz headphone
     // endpoint otherwise forces the whole engine to 44.1, and some USB mics
     // (and VAC's capture pins) only expose 48 kHz.
+    // An empty master/bus assignment means the user switched that output off.
+    // Only the first run picks the Windows default for it.
+    if (!bus.deviceId && !remapCables) continue
+    if (bus.deviceId && !known.has(bus.deviceId)) continue
+
     const preferred = forceMaster
       ? physicalOutputs.find((d) => d.isDefault && d.sampleRate >= 48000) ??
         physicalOutputs.find((d) => d.sampleRate >= 48000) ??
@@ -205,12 +217,16 @@ function normalizeDevices(devices: AudioDevice[]): void {
       : id === 'A1'
         ? pool.find((d) => d.isDefault)
         : undefined
-    let deviceId = ''
-    if (preferred && !usedOutputs.has(preferred.id)) {
-      usedOutputs.add(preferred.id)
-      deviceId = preferred.id
+    let deviceId = bus.deviceId
+    if (!deviceId) {
+      if (preferred && !usedOutputs.has(preferred.id)) {
+        usedOutputs.add(preferred.id)
+        deviceId = preferred.id
+      } else {
+        deviceId = take(pool, usedOutputs)
+      }
     } else {
-      deviceId = take(pool, usedOutputs)
+      usedOutputs.add(deviceId)
     }
 
     if (deviceId !== bus.deviceId) {

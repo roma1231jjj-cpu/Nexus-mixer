@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { useMixer } from '../store/useMixer'
-import { useUndoRedo, type FxSnapshot } from './undoRedo'
-import type { StripFx, BusFx, Strip, Bus } from '../types'
+import {
+  captureMixer,
+  mixerFingerprint,
+  useUndoRedo,
+  type MixerSnapshotState,
+} from './undoRedo'
 
 const isTyping = (target: EventTarget | null): boolean => {
   if (!(target instanceof HTMLElement)) return false
@@ -9,56 +13,34 @@ const isTyping = (target: EventTarget | null): boolean => {
   return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable
 }
 
-/** Snapshot the FX state of every channel in a given mixer snapshot. */
-const snapshotFx = (state: {
-  strips: Record<string, Strip>
-  buses: Record<string, Bus>
-}): FxSnapshot => {
-  const stripFx: Record<string, StripFx> = {}
-  const busFx: Record<string, BusFx> = {}
-  for (const [id, strip] of Object.entries(state.strips)) {
-    stripFx[id] = structuredClone(strip.fx) as StripFx
-  }
-  for (const [id, bus] of Object.entries(state.buses)) {
-    busFx[id] = structuredClone(bus.fx) as BusFx
-  }
-  return { stripFx, busFx }
-}
-
-const fxChanged = (
-  state: { strips: Record<string, Strip>; buses: Record<string, Bus> },
-  previous: { strips: Record<string, Strip>; buses: Record<string, Bus> },
-): boolean => {
-  for (const id of Object.keys(state.strips)) {
-    if (state.strips[id]?.fx !== previous.strips[id]?.fx) return true
-  }
-  for (const id of Object.keys(state.buses)) {
-    if (state.buses[id]?.fx !== previous.buses[id]?.fx) return true
-  }
-  return false
-}
-
 /**
- * Wires FX changes into the undo history.
+ * Wires mixer changes into the undo history.
  *
- * The *pre-change* state is captured once per burst of parameter edits and
- * committed after the user pauses. This is what makes Ctrl+Z restore the value
- * the control had before the drag instead of re-applying the latest one.
+ * Every editable parameter is covered now (faders, pan, mute/solo, routing,
+ * names, FX, buses, master EQ/gain, VCA). The pre-change state is captured once
+ * per burst of edits and committed after the user pauses, so Ctrl+Z restores
+ * the value a control had before the drag.
  */
 export function useUndoRedoIntegration() {
   const { capture, undo, redo, canUndo, canRedo } = useUndoRedo()
   const timerRef = useRef<number | null>(null)
-  const pendingRef = useRef<FxSnapshot | null>(null)
+  const pendingRef = useRef<MixerSnapshotState | null>(null)
   const applyingRef = useRef(false)
+  const fingerprintRef = useRef<string>('')
 
   useEffect(() => {
-    const unsubscribe = useMixer.subscribe((state, previous) => {
+    const state = useMixer.getState()
+    fingerprintRef.current = mixerFingerprint(state)
+
+    const unsubscribe = useMixer.subscribe((next) => {
       if (applyingRef.current) return
-      if (!fxChanged(state, previous)) return
-
+      const fingerprint = mixerFingerprint(next)
+      if (fingerprint === fingerprintRef.current) return
       // Remember only the state before the first change of this burst.
-      if (!pendingRef.current) pendingRef.current = snapshotFx(previous)
-
+      if (!pendingRef.current) {
+        pendingRef.current = captureMixer(useMixer.getState())
+      }
+      fingerprintRef.current = fingerprint
       if (timerRef.current) window.clearTimeout(timerRef.current)
       timerRef.current = window.setTimeout(() => {
         if (pendingRef.current) capture(pendingRef.current)
@@ -73,22 +55,50 @@ export function useUndoRedoIntegration() {
     }
   }, [capture])
 
-  const currentSnapshot = useCallback((): FxSnapshot => {
-    const state = useMixer.getState()
-    return snapshotFx(state)
-  }, [])
+  const currentSnapshot = useCallback((): MixerSnapshotState => captureMixer(useMixer.getState()), [])
 
-  const applySnapshot = useCallback((snapshot: FxSnapshot) => {
+  const applySnapshot = useCallback((snapshot: MixerSnapshotState) => {
     const state = useMixer.getState()
     applyingRef.current = true
     try {
-      for (const [id, fx] of Object.entries(snapshot.stripFx)) {
-        state.setStripFx(id as Parameters<typeof state.setStripFx>[0], structuredClone(fx) as StripFx)
+      for (const [id, data] of Object.entries(snapshot.strips)) {
+        const stripId = id as Parameters<typeof state.setStrip>[0]
+        state.setStrip(stripId, {
+          name: data.name,
+          gainDb: data.gainDb,
+          pan: data.pan,
+          mute: data.mute,
+          solo: data.solo,
+          mono: data.mono,
+          phase: data.phase,
+          voiceTiltDb: data.voiceTiltDb,
+        })
+        state.setStripFx(stripId, structuredClone(data.fx))
+        for (const [busId, route] of Object.entries(data.routing)) {
+          state.setRoute(stripId, busId as Parameters<typeof state.setRoute>[1], {
+            on: route.on,
+            levelDb: route.levelDb,
+          })
+        }
       }
-      for (const [id, fx] of Object.entries(snapshot.busFx)) {
-        state.setBusFx(id as Parameters<typeof state.setBusFx>[0], structuredClone(fx) as BusFx)
+      for (const [id, data] of Object.entries(snapshot.buses)) {
+        const busId = id as Parameters<typeof state.setBus>[0]
+        state.setBus(busId, {
+          gainDb: data.gainDb,
+          mute: data.mute,
+          mono: data.mono,
+          dim: data.dim,
+        })
+        state.setBusFx(busId, structuredClone(data.fx))
       }
+      for (const band of snapshot.masterEq) {
+        state.setMasterEqBand(band.id, band)
+      }
+      state.setMasterEqEnabled(snapshot.masterEqEnabled)
+      state.setMasterGainDb(snapshot.masterGainDb)
+      state.setVcaGroups(structuredClone(snapshot.vcaGroups))
     } finally {
+      fingerprintRef.current = mixerFingerprint(useMixer.getState())
       applyingRef.current = false
     }
   }, [])
@@ -105,8 +115,7 @@ export function useUndoRedoIntegration() {
 
   const handleUndo = useCallback(() => {
     flushPending()
-    const current = currentSnapshot()
-    const snapshot = undo(current.stripFx, current.busFx)
+    const snapshot = undo(currentSnapshot())
     if (!snapshot) return false
     applySnapshot(snapshot)
     return true
@@ -114,8 +123,7 @@ export function useUndoRedoIntegration() {
 
   const handleRedo = useCallback(() => {
     flushPending()
-    const current = currentSnapshot()
-    const snapshot = redo(current.stripFx, current.busFx)
+    const snapshot = redo(currentSnapshot())
     if (!snapshot) return false
     applySnapshot(snapshot)
     return true

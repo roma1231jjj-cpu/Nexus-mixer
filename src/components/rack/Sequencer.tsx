@@ -1,19 +1,25 @@
 import { Fragment, useState, useEffect, useRef } from 'react'
 import { Play, Square, Music } from 'lucide-react'
 import { StepSequencerState, createSequencer, toggleStep, STEPS } from '../../lib/sequencer'
+import { loadSequencerPattern, saveSequencerPattern } from '../../lib/soundBank'
 import { useT } from '../../i18n'
 
 interface SequencerProps {
   sampleIds: string[]
   sampleNames: Record<string, string>
   sampleColors: Record<string, string>
-  onTrigger: (sampleId: string) => void
+  /** `delayMs` lets the engine start the voice sample-accurately. */
+  onTrigger: (sampleId: string, delayMs?: number) => void
   onStop: (sampleId: string) => void
 }
 
 export function Sequencer({ sampleIds, sampleNames, sampleColors, onTrigger, onStop }: SequencerProps) {
   const t = useT()
-  const [seq, setSeq] = useState<StepSequencerState>(createSequencer)
+  const [seq, setSeq] = useState<StepSequencerState>(() => {
+    const base = createSequencer()
+    const stored = loadSequencerPattern()
+    return stored ? { ...base, pattern: stored.pattern, bpm: stored.bpm, swing: stored.swing } : base
+  })
   const stepTimerRef = useRef<number | null>(null)
 
   const onTriggerRef = useRef(onTrigger)
@@ -39,43 +45,62 @@ export function Sequencer({ sampleIds, sampleNames, sampleColors, onTrigger, onS
     }
   }, [])
 
-  // Playback loop. The timer is restarted only by the running flag; BPM,
-  // pattern, sample list and callbacks are read through refs, so a parent
-  // re-render never restarts the cycle.
+  // Playback loop. Steps are scheduled against `performance.now()` instead of
+  // being chained with `setTimeout(interval)` after each callback, so a late
+  // timer does not push the whole pattern behind: the next step is always due at
+  // `start + n * interval`. The engine receives the remaining delay, so a step
+  // that we wake up late still lands on the audio grid.
   useEffect(() => {
     if (!seq.running) return
     let cancelled = false
+    let nextDue = performance.now()
+    let nextStep = 0
+    let timer = 0
+    const LOOKAHEAD = 25
 
-    const fire = (step: number) => {
+    const intervalFor = () => 60000 / Math.max(1, bpmRef.current) / 4
+
+    const fire = (step: number, delayMs: number) => {
       const pattern = patternRef.current
       for (const sampleId of sampleIdsRef.current) {
-        if (pattern[sampleId]?.[step]) onTriggerRef.current(sampleId)
+        if (pattern[sampleId]?.[step]) onTriggerRef.current(sampleId, delayMs)
       }
       setSeq((prev) => (prev.currentStep === step ? prev : { ...prev, currentStep: step }))
     }
 
-    const schedule = () => {
-      const interval = 60000 / Math.max(1, bpmRef.current) / 4
-      stepTimerRef.current = window.setTimeout(() => {
-        if (cancelled) return
-        stepIndexRef.current = (stepIndexRef.current + 1) % STEPS
-        fire(stepIndexRef.current)
-        schedule()
-      }, interval)
+    const tick = () => {
+      if (cancelled) return
+      const now = performance.now()
+      // Catch up if the tab was throttled, but never fire more than 4 steps at
+      // once — that would be a burst, not music.
+      let guard = 0
+      while (nextDue <= now + LOOKAHEAD && guard < 4) {
+        const delayMs = Math.max(0, nextDue - now)
+        fire(nextStep, delayMs)
+        nextStep = (nextStep + 1) % STEPS
+        nextDue += intervalFor()
+        guard++
+      }
+      if (guard >= 4) nextDue = now + intervalFor()
+      timer = window.setTimeout(tick, LOOKAHEAD)
     }
 
     stepIndexRef.current = 0
-    fire(0)
-    schedule()
+    nextDue = performance.now()
+    tick()
 
     return () => {
       cancelled = true
-      if (stepTimerRef.current !== null) {
-        window.clearTimeout(stepTimerRef.current)
-        stepTimerRef.current = null
-      }
+      window.clearTimeout(timer)
     }
   }, [seq.running])
+
+  // Remember the pattern between openings and app restarts.
+  useEffect(() => {
+    if (!saveSequencerPattern(seq.pattern, seq.bpm, seq.swing)) {
+      // Storage can be full or disabled; the pattern still works this session.
+    }
+  }, [seq.pattern, seq.bpm, seq.swing])
 
   const handleStart = () => {
     stepIndexRef.current = 0

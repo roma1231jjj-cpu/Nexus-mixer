@@ -52,20 +52,35 @@ async function getInvoke(): Promise<InvokeFn | null> {
   return invokePromise
 }
 
-async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T | null> {
+export interface CallResult<T> {
+  ok: boolean
+  value: T | null
+  error: string | null
+}
+
+/**
+ * Every call carries its own error. Sharing one `lastErrorText` meant a
+ * background poll could wipe the message before the caller read it.
+ */
+async function callResult<T>(cmd: string, args?: Record<string, unknown>): Promise<CallResult<T>> {
   const invoke = await getInvoke()
-  if (!invoke) return null
-  lastErrorText = null
+  if (!invoke) return { ok: false, value: null, error: 'desktop only' }
   try {
-    return await invoke<T>(cmd, args)
+    return { ok: true, value: await invoke<T>(cmd, args), error: null }
   } catch (error) {
-    lastErrorText = errorText(error)
+    const message = errorText(error)
     console.error(`[engineBridge] ${cmd} failed`, error)
-    return null
+    return { ok: false, value: null, error: message }
   }
 }
 
-/** Message from the most recent failed invoke, if any. */
+async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T | null> {
+  const result = await callResult<T>(cmd, args)
+  if (!result.ok) lastErrorText = result.error
+  return result.value
+}
+
+/** Message from the most recent failed invoke, if any (kept for old callers). */
 export function getLastEngineError(): string | null {
   return lastErrorText
 }
@@ -178,4 +193,72 @@ export const engineBridge = {
   configureAi(config: Record<string, unknown>): Promise<AiStatus | null> {
     return call<AiStatus>('configure_ai_sidecar', { config })
   },
+
+  /* ── sound pads: real audio goes through the mixer graph ── */
+
+  /**
+   * Upload decoded PCM (interleaved f32).
+   *
+   * The samples travel as base64 of the little-endian f32 bytes: a JSON array
+   * of 480 000 floats would be ~9 MB of text and take hundreds of milliseconds
+   * to format and parse, while the byte payload is ~2.5 MB and decodes in Rust
+   * in a few milliseconds.
+   */
+  padLoad(id: string, sampleRate: number, channels: number, data: Float32Array): Promise<CallResult<null>> {
+    return callResult<null>('pad_load', { id, sampleRate, channels, data: encodePcmBase64(data) })
+  },
+
+  padUnload(id: string): Promise<CallResult<null>> {
+    return callResult<null>('pad_unload', { id })
+  },
+
+  padPlay(id: string, params: PadPlayParams): Promise<CallResult<null>> {
+    return callResult<null>('pad_play', { id, params })
+  },
+
+  padUpdate(id: string, params: PadPlayParams): Promise<CallResult<null>> {
+    return callResult<null>('pad_update', { id, params })
+  },
+
+  padStop(id: string): Promise<CallResult<null>> {
+    return callResult<null>('pad_stop', { id })
+  },
+
+  padStopAll(): Promise<CallResult<null>> {
+    return callResult<null>('pad_stop_all')
+  },
+
+  padLevels(): Promise<CallResult<Record<string, number>>> {
+    return callResult<Record<string, number>>('pad_levels')
+  },
+
+  padLoaded(): Promise<CallResult<string[]>> {
+    return callResult<string[]>('pad_loaded')
+  },
+
+  /** Method with its own error channel, for callers that must not guess. */
+  callResult,
+}
+
+/** Base64 of the raw little-endian f32 bytes, built in chunks. */
+function encodePcmBase64(data: Float32Array): string {
+  const bytes = new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
+  const CHUNK = 0x8000
+  let binary = ''
+  for (let offset = 0; offset < bytes.length; offset += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + CHUNK))
+  }
+  return btoa(binary)
+}
+
+/** Parameters accepted by `pad_play` / `pad_update`. */
+export interface PadPlayParams {
+  volume: number
+  pan: number
+  loop: boolean
+  pitch: number
+  /** `master`, a strip id (`A2`) or a bus id (`B1`). */
+  target: string
+  /** Start delay in milliseconds, used by the sequencer for tight timing. */
+  delayMs?: number
 }

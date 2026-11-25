@@ -1678,3 +1678,67 @@
 }
 
 /* --------------------------------- end cable ------------------------------- */
+
+/* ------------------------------ sound pads ------------------------------ */
+
+.pad-routing-notice {
+  display: flex;
+  align-items: center;
+  min-height: 16px;
+  margin-bottom: 8px;
+  font-size: 10px;
+  line-height: 1.35;
+  letter-spacing: 0.01em;
+  color: var(--faint);
+  overflow-wrap: anywhere;
+}
+
+.pad-routing-notice[data-on='0'] {
+  color: var(--warn);
+}
+
+.pad-routing-notice[data-on='1'] {
+  color: var(--good);
+}
+
+.pad-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.pad-toolbar .pad-upload {
+  flex: 0 0 auto;
+  height: 28px;
+  min-width: 132px;
+}
+
+.pad-master-volume {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1 1 auto;
+  min-width: 0;
+  justify-content: flex-end;
+}
+
+.pad-master-volume input[type='range'] {
+  flex: 1 1 60px;
+  max-width: 140px;
+  min-width: 40px;
+}
+
+.pad-master-value {
+  flex: 0 0 auto;
+  width: 32px;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  color: var(--faint);
+  text-align: right;
+}
+
+.pad-stop {
+  flex: 0 0 auto;
+  height: 24px;
+}

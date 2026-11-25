@@ -28,8 +28,7 @@ pub const EQ_BANDS: usize = 10;
 
 pub const STRIP_IDS: [&str; STRIPS] = ["hw1", "hw2", "hw3", "vaio", "aux", "hw4", "hw5", "hw6"];
 pub const BUS_IDS: [&str; BUSES] = [
-    "A1", "A2", "A3",
-    "B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B9", "B10", "B11", "B12",
+    "A1", "A2", "A3", "B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B9", "B10", "B11", "B12",
 ];
 
 // ---------------------------------------------------------------------------
@@ -75,7 +74,11 @@ impl AiBlock {
         if !self.enabled {
             return None;
         }
-        let fallback = if self.source.is_empty() { "hw1" } else { self.source.as_str() };
+        let fallback = if self.source.is_empty() {
+            "hw1"
+        } else {
+            self.source.as_str()
+        };
         STRIP_IDS.iter().position(|id| *id == fallback)
     }
 
@@ -89,7 +92,11 @@ impl AiBlock {
 
     /// Strip the built-in local voice stage converts.
     pub fn voice_slot(&self) -> Option<usize> {
-        if self.local { self.source_slot() } else { None }
+        if self.local {
+            self.source_slot()
+        } else {
+            None
+        }
     }
 }
 
@@ -976,14 +983,18 @@ impl VoiceFx {
         let mut wet_left = self.shelf_left.process(self.left.process(left));
         let mut wet_right = self.shelf_right.process(self.right.process(right));
         if self.robot {
-            self.robot_phase = (self.robot_phase + 2.0 * std::f32::consts::PI * 70.0 / self.sample_rate)
+            self.robot_phase = (self.robot_phase
+                + 2.0 * std::f32::consts::PI * 70.0 / self.sample_rate)
                 .rem_euclid(2.0 * std::f32::consts::PI);
             let carrier = 0.55 + 0.45 * self.robot_phase.sin();
             wet_left *= carrier;
             wet_right *= carrier;
         }
         let dry = 1.0 - self.mix;
-        (left * dry + wet_left * self.mix, right * dry + wet_right * self.mix)
+        (
+            left * dry + wet_left * self.mix,
+            right * dry + wet_right * self.mix,
+        )
     }
 
     fn reset(&mut self) {
@@ -1077,13 +1088,8 @@ impl MixerGraph {
         for index in 0..EQ_BANDS {
             let band = params.master_eq[index];
             self.master_eq_enabled[index] = band.enabled;
-            let coeffs = BiquadCoeffs::design(
-                band.kind,
-                self.sample_rate,
-                band.freq,
-                band.gain,
-                band.q,
-            );
+            let coeffs =
+                BiquadCoeffs::design(band.kind, self.sample_rate, band.freq, band.gain, band.q);
             for bus in 0..BUSES {
                 self.master_eq_left[bus][index].set_coeffs(coeffs);
                 self.master_eq_right[bus][index].set_coeffs(coeffs);
@@ -1094,10 +1100,37 @@ impl MixerGraph {
 
     #[inline]
     pub fn process_frame(&mut self, inputs: &[(f32, f32); STRIPS]) -> [(f32, f32); BUSES] {
+        self.process_frame_with_extras(
+            inputs,
+            &[(0.0, 0.0); STRIPS],
+            &[(0.0, 0.0); BUSES],
+            (0.0, 0.0),
+            usize::MAX,
+        )
+    }
+
+    /// Same as [`Self::process_frame`] but sums external sources (sound pads)
+    /// into the strip inputs, the bus sums and the master sum. Extras are added
+    /// *before* the stage they target, so pad audio runs through the same EQ,
+    /// compressor, VCA, routing and master processing as any other signal.
+    #[inline]
+    pub fn process_frame_with_extras(
+        &mut self,
+        inputs: &[(f32, f32); STRIPS],
+        strip_extra: &[(f32, f32); STRIPS],
+        bus_extra: &[(f32, f32); BUSES],
+        master_extra: (f32, f32),
+        master_bus: usize,
+    ) -> [(f32, f32); BUSES] {
         self.bus_accumulator.fill((0.0, 0.0));
 
-        for (index, (input, strip)) in inputs.iter().zip(self.strips.iter_mut()).enumerate() {
-            let (mut out_left, mut out_right) = strip.process(input.0, input.1);
+        for (index, ((input, extra), strip)) in inputs
+            .iter()
+            .zip(strip_extra.iter())
+            .zip(self.strips.iter_mut())
+            .enumerate()
+        {
+            let (mut out_left, mut out_right) = strip.process(input.0 + extra.0, input.1 + extra.1);
             if self.voice_source == Some(index) {
                 let (wet_left, wet_right) = self.voice.process(out_left, out_right);
                 out_left = wet_left;
@@ -1138,11 +1171,19 @@ impl MixerGraph {
             }
         }
 
+        if master_bus < BUSES {
+            self.bus_accumulator[master_bus].0 += master_extra.0;
+            self.bus_accumulator[master_bus].1 += master_extra.1;
+        }
+        for (bus, extra) in bus_extra.iter().enumerate() {
+            self.bus_accumulator[bus].0 += extra.0;
+            self.bus_accumulator[bus].1 += extra.1;
+        }
+
         let mut outputs = [(0.0, 0.0); BUSES];
         for (bus, out) in outputs.iter_mut().enumerate() {
-            let (mut left, mut right) = self
-                .buses[bus]
-                .process(self.bus_accumulator[bus].0, self.bus_accumulator[bus].1);
+            let (mut left, mut right) =
+                self.buses[bus].process(self.bus_accumulator[bus].0, self.bus_accumulator[bus].1);
             for index in 0..EQ_BANDS {
                 if self.master_eq_enabled[index] {
                     left = self.master_eq_left[bus][index].process(left);
@@ -1164,15 +1205,17 @@ impl MixerGraph {
     /// Copy accumulated peaks into the shared meter bank and reset them.
     pub fn publish_meters(&mut self, meters: &MeterBank) {
         for index in 0..STRIPS {
-            meters
-                .strips[index]
-                .store(linear_to_db(self.strip_peak[index]).to_bits(), Ordering::Relaxed);
+            meters.strips[index].store(
+                linear_to_db(self.strip_peak[index]).to_bits(),
+                Ordering::Relaxed,
+            );
             self.strip_peak[index] = 0.0;
         }
         for index in 0..BUSES {
-            meters
-                .buses[index]
-                .store(linear_to_db(self.bus_peak[index]).to_bits(), Ordering::Relaxed);
+            meters.buses[index].store(
+                linear_to_db(self.bus_peak[index]).to_bits(),
+                Ordering::Relaxed,
+            );
             self.bus_peak[index] = 0.0;
         }
     }
@@ -1255,9 +1298,13 @@ mod tests {
 
     fn strip_with_route(bus: &str) -> StripParams {
         let mut strip = StripParams::default();
-        strip
-            .routing
-            .insert(bus.into(), RouteParams { on: true, level_db: 0.0 });
+        strip.routing.insert(
+            bus.into(),
+            RouteParams {
+                on: true,
+                level_db: 0.0,
+            },
+        );
         strip
     }
 
@@ -1279,7 +1326,11 @@ mod tests {
     #[test]
     fn ai_path_arms_and_bypasses_from_snapshot() {
         let mut params = MixerParams {
-            ai: AiBlock { enabled: true, mode: "hybrid".into(), ..AiBlock::default() },
+            ai: AiBlock {
+                enabled: true,
+                mode: "hybrid".into(),
+                ..AiBlock::default()
+            },
             ..MixerParams::default()
         };
         let armed = params.to_graph();
@@ -1290,12 +1341,20 @@ mod tests {
         graph.apply_params(&armed);
         assert_eq!(graph.ai_source, mic);
 
-        params.ai = AiBlock { enabled: true, mode: "dsp".into(), ..AiBlock::default() };
+        params.ai = AiBlock {
+            enabled: true,
+            mode: "dsp".into(),
+            ..AiBlock::default()
+        };
         graph.apply_params(&params.to_graph());
         assert_eq!(graph.ai_source, None);
         assert_eq!(graph.voice_source, None);
 
-        params.ai = AiBlock { enabled: false, mode: "ai".into(), ..AiBlock::default() };
+        params.ai = AiBlock {
+            enabled: false,
+            mode: "ai".into(),
+            ..AiBlock::default()
+        };
         graph.apply_params(&params.to_graph());
         assert_eq!(graph.ai_source, None);
     }
@@ -1476,7 +1535,10 @@ mod tests {
         };
         params.strips.insert("hw1".into(), strip_with_route("A1"));
         params.buses.insert("A1".into(), bus_default());
-        assert_eq!(params.to_graph().voice_source, STRIP_IDS.iter().position(|id| *id == "hw1"));
+        assert_eq!(
+            params.to_graph().voice_source,
+            STRIP_IDS.iter().position(|id| *id == "hw1")
+        );
 
         let mut graph = MixerGraph::new(SR);
         graph.apply_params(&params.to_graph());
@@ -1637,8 +1699,8 @@ mod tests {
             for index in 0..12_000 {
                 let sample = (2.0 * std::f32::consts::PI * 110.0 * index as f32 / SR).sin() * 0.5;
                 let mut inputs = silence();
-            inputs[0] = (sample, sample);
-            let out = graph.process_frame(&inputs);
+                inputs[0] = (sample, sample);
+                let out = graph.process_frame(&inputs);
                 if index > 4_000 {
                     energy += out[0].0 * out[0].0;
                 }
@@ -1648,6 +1710,9 @@ mod tests {
 
         let bypass = measure(false);
         let filtered = measure(true);
-        assert!(filtered < bypass * 0.05, "filtered = {filtered}, bypass = {bypass}");
+        assert!(
+            filtered < bypass * 0.05,
+            "filtered = {filtered}, bypass = {bypass}"
+        );
     }
 }

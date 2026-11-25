@@ -70,7 +70,7 @@ impl SpscRing {
             unsafe {
                 *self.buffer[index].get() = *sample;
             }
-        };
+        }
 
         // Publish the samples only after they are fully written.
         self.tail.store(tail.wrapping_add(count), Ordering::Release);
@@ -162,7 +162,12 @@ mod tests {
         let ring = SpscRing::new(2);
         let mut out = [0.0; 4];
         for generation in 0..10 {
-            let data = [generation as f32, generation as f32 + 0.5, generation as f32 + 0.25, generation as f32 + 0.75];
+            let data = [
+                generation as f32,
+                generation as f32 + 0.5,
+                generation as f32 + 0.25,
+                generation as f32 + 0.75,
+            ];
             assert_eq!(ring.push_slice(&data), 4);
             assert_eq!(ring.pop_slice(&mut out), 4);
             assert_eq!(out, data);

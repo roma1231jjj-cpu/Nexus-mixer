@@ -22,6 +22,8 @@ export function MacroPanel() {
   const presets = useMixer((s) => s.presets)
   const strips = useMixer((s) => s.strips)
   const runMacro = useMixer((s) => s.runMacro)
+  const pressMacro = useMixer((s) => s.pressMacro)
+  const releaseMacro = useMixer((s) => s.releaseMacro)
   const addMacro = useMixer((s) => s.addMacro)
   const updateMacro = useMixer((s) => s.updateMacro)
   const removeMacro = useMixer((s) => s.removeMacro)
@@ -33,7 +35,7 @@ export function MacroPanel() {
     if (pressedRef.current) return
     pressedRef.current = id
     setPressed(id)
-    runMacro(id)
+    pressMacro(id)
     notify(t('macro.holdToast', { label }))
   }
 
@@ -41,7 +43,7 @@ export function MacroPanel() {
     if (pressedRef.current !== id) return
     pressedRef.current = null
     setPressed(null)
-    runMacro(id)
+    releaseMacro(id)
   }
 
   return (

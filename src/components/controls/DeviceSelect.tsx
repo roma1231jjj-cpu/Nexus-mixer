@@ -20,6 +20,18 @@ interface DeviceSelectProps {
  * absolutely-positioned custom menu would be cut off inside the console. The
  * native popup also keeps long WASAPI names readable.
  */
+/**
+ * Endpoints with the same friendly name are told apart by the `#N` suffix the
+ * engine appends to their id (`in:Mic#2`), so the menu does not show two
+ * identical "Microphone" lines.
+ */
+function labelOf(device: AudioDevice): string {
+  const hash = device.id.lastIndexOf('#')
+  if (hash <= 0) return device.name
+  const suffix = device.id.slice(hash)
+  return /^#\d+$/.test(suffix) ? `${device.name} ${suffix}` : device.name
+}
+
 export function DeviceSelect({
   value,
   devices,
@@ -55,11 +67,11 @@ export function DeviceSelect({
         onChange={(event) => onChange(event.target.value)}
       >
         <option value="">{emptyLabel}</option>
-        {!known && current ? <option value={value}>{current.name}</option> : null}
+        {!known && current ? <option value={value}>{labelOf(current)}</option> : null}
         {!known && !current && value ? <option value={value}>{value}</option> : null}
         {options.map((device) => (
           <option key={device.id} value={device.id}>
-            {device.name}
+            {labelOf(device)}
           </option>
         ))}
       </select>

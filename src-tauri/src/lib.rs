@@ -52,7 +52,10 @@ fn get_engine_status(state: SharedEngine<'_>) -> EngineStatus {
 /// If the engine is running, only audio-affecting changes restart the streams;
 /// tray/autostart switches are applied silently.
 #[tauri::command]
-fn set_engine_config(config: EngineConfig, state: SharedEngine<'_>) -> Result<EngineStatus, String> {
+fn set_engine_config(
+    config: EngineConfig,
+    state: SharedEngine<'_>,
+) -> Result<EngineStatus, String> {
     let previous = state.config();
     let was_running = state.is_engine_running();
     let restart = was_running && previous.audio_changed(&config);
@@ -136,6 +139,148 @@ fn get_driver_status(state: SharedEngine<'_>) -> DriverStatus {
     state.driver()
 }
 
+/// Minimal base64 decoder (RFC 4648, no padding errors tolerated silently).
+fn decode_base64(input: &str) -> Result<Vec<u8>, String> {
+    let mut output = Vec::with_capacity(input.len() * 3 / 4 + 4);
+    let mut buffer: u32 = 0;
+    let mut bits = 0u32;
+    for byte in input.bytes() {
+        let value = match byte {
+            b'A'..=b'Z' => byte - b'A',
+            b'a'..=b'z' => byte - b'a' + 26,
+            b'0'..=b'9' => byte - b'0' + 52,
+            b'+' => 62,
+            b'/' => 63,
+            b'=' => continue,
+            _ if byte.is_ascii_whitespace() => continue,
+            _ => return Err("некорректная base64-строка сэмпла".into()),
+        } as u32;
+        buffer = (buffer << 6) | value;
+        bits += 6;
+        if bits >= 8 {
+            bits -= 8;
+            output.push(((buffer >> bits) & 0xFF) as u8);
+        }
+    }
+    Ok(output)
+}
+
+/// Upload decoded PCM for a sound pad. Works while the engine is stopped:
+/// the bank stores the sample and starts playing it once the graph is live.
+#[tauri::command]
+fn pad_load(
+    id: String,
+    sample_rate: u32,
+    channels: u16,
+    data: String,
+    state: SharedEngine<'_>,
+) -> Result<(), String> {
+    let bytes = decode_base64(&data)?;
+    if bytes.len() % 4 != 0 {
+        return Err("размер PCM не кратен четырём байтам".into());
+    }
+    let pcm: Vec<f32> = bytes
+        .chunks_exact(4)
+        .map(|chunk| f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
+        .collect();
+    state.pads().load(id, sample_rate, channels, pcm)
+}
+
+#[tauri::command]
+fn pad_unload(id: String, state: SharedEngine<'_>) -> Result<(), String> {
+    state.pads().unload(&id)
+}
+
+/// Pad parameters shared by `pad_play` and `pad_update`.
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+struct PadPlayRequest {
+    volume: f32,
+    pan: f32,
+    #[serde(rename = "loop")]
+    loop_play: bool,
+    pitch: f32,
+    /// `master`, a strip id (`hw1`, `vaio`, …) or a bus id (`A1`, `B7`, …).
+    target: String,
+    /// Start delay in milliseconds, used by the sequencer.
+    delay_ms: f32,
+}
+
+impl Default for PadPlayRequest {
+    fn default() -> Self {
+        Self {
+            volume: 1.0,
+            pan: 0.0,
+            loop_play: false,
+            pitch: 0.0,
+            target: "master".into(),
+            delay_ms: 0.0,
+        }
+    }
+}
+
+impl PadPlayRequest {
+    fn into_params(self, sample_rate: u32) -> Result<engine::pads::PadParams, String> {
+        let target = engine::pads::parse_target(&self.target)
+            .ok_or_else(|| format!("неизвестная цель маршрутизации: {}", self.target))?;
+        let delay_ms = if self.delay_ms.is_finite() {
+            self.delay_ms.clamp(0.0, 5_000.0)
+        } else {
+            0.0
+        };
+        Ok(engine::pads::PadParams {
+            volume: self.volume,
+            pan: self.pan,
+            loop_play: self.loop_play,
+            pitch: self.pitch,
+            target,
+            delay_frames: (delay_ms * sample_rate as f32 / 1_000.0).round() as u32,
+        })
+    }
+}
+
+fn pad_sample_rate(state: &EngineState) -> u32 {
+    state
+        .runtime_info()
+        .map(|info| info.sample_rate)
+        .filter(|rate| *rate > 0)
+        .unwrap_or_else(|| state.config().sample_rate)
+        .max(1)
+}
+
+#[tauri::command]
+fn pad_play(id: String, params: PadPlayRequest, state: SharedEngine<'_>) -> Result<(), String> {
+    let rate = pad_sample_rate(&state);
+    state.pads().play(&id, params.into_params(rate)?)
+}
+
+#[tauri::command]
+fn pad_update(id: String, params: PadPlayRequest, state: SharedEngine<'_>) -> Result<(), String> {
+    let rate = pad_sample_rate(&state);
+    state.pads().update(&id, params.into_params(rate)?)
+}
+
+#[tauri::command]
+fn pad_stop(id: String, state: SharedEngine<'_>) -> Result<(), String> {
+    state.pads().stop(&id)
+}
+
+#[tauri::command]
+fn pad_stop_all(state: SharedEngine<'_>) -> Result<(), String> {
+    state.pads().stop_all()
+}
+
+/// Peak level 0..1 per playing pad, read from atomics.
+#[tauri::command]
+fn pad_levels(state: SharedEngine<'_>) -> std::collections::BTreeMap<String, f32> {
+    state.pads().levels()
+}
+
+#[tauri::command]
+fn pad_loaded(state: SharedEngine<'_>) -> Vec<String> {
+    state.pads().loaded()
+}
+
 /// Rename detected virtual cable endpoints to `Nexus Cable B1..B12`.
 ///
 /// The endpoint properties live under HKLM, so the script is launched through
@@ -165,7 +310,10 @@ fn rename_virtual_cables(app: AppHandle) -> Result<String, String> {
     };
 
     if !script.exists() {
-        return Err(format!("Не найден скрипт переименования: {}", script.display()));
+        return Err(format!(
+            "Не найден скрипт переименования: {}",
+            script.display()
+        ));
     }
 
     let escaped = script.display().to_string().replace('\'', "''");
@@ -173,12 +321,21 @@ fn rename_virtual_cables(app: AppHandle) -> Result<String, String> {
         "$p = Start-Process -FilePath 'powershell.exe' -Verb RunAs -Wait -PassThru -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File','{escaped}'); exit $p.ExitCode"
     );
     let output = Command::new("powershell.exe")
-        .args(["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", &command])
+        .args([
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            &command,
+        ])
         .output()
         .map_err(|error| format!("Не удалось запустить PowerShell: {error}"))?;
 
     if output.status.success() {
-        Ok("Кабели переименованы. Перезапустите Nexus-Mixer, чтобы обновить список устройств.".into())
+        Ok(
+            "Кабели переименованы. Перезапустите Nexus-Mixer, чтобы обновить список устройств."
+                .into(),
+        )
     } else {
         let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
         Err(if stderr.is_empty() {
@@ -274,6 +431,61 @@ fn configure_ai_sidecar(
     state.ai().configure(config)
 }
 
+#[cfg(test)]
+mod pad_wire_tests {
+    use super::decode_base64;
+
+    #[test]
+    fn base64_roundtrip_matches_known_vector() {
+        // "Man" -> TWFu
+        assert_eq!(decode_base64("TWFu").unwrap(), b"Man".to_vec());
+        assert_eq!(decode_base64("TQ==").unwrap(), b"M".to_vec());
+        assert_eq!(decode_base64("").unwrap(), Vec::<u8>::new());
+    }
+
+    #[test]
+    fn base64_rejects_garbage() {
+        assert!(decode_base64("TWF*").is_err());
+    }
+
+    #[test]
+    fn f32_bytes_survive_the_wire_format() {
+        let samples = [-1.0_f32, 0.0, 0.5, 1.0];
+        let bytes: Vec<u8> = samples
+            .iter()
+            .flat_map(|value| value.to_le_bytes())
+            .collect();
+        let alphabet = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        let mut encoded = String::new();
+        for chunk in bytes.chunks(3) {
+            let b = [
+                chunk[0],
+                *chunk.get(1).unwrap_or(&0),
+                *chunk.get(2).unwrap_or(&0),
+            ];
+            let value = ((b[0] as u32) << 16) | ((b[1] as u32) << 8) | b[2] as u32;
+            encoded.push(alphabet[(value >> 18) as usize & 63] as char);
+            encoded.push(alphabet[(value >> 12) as usize & 63] as char);
+            if chunk.len() > 1 {
+                encoded.push(alphabet[(value >> 6) as usize & 63] as char);
+            } else {
+                encoded.push('=');
+            }
+            if chunk.len() > 2 {
+                encoded.push(alphabet[value as usize & 63] as char);
+            } else {
+                encoded.push('=');
+            }
+        }
+        let decoded = decode_base64(&encoded).unwrap();
+        let roundtrip: Vec<f32> = decoded
+            .chunks_exact(4)
+            .map(|chunk| f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
+            .collect();
+        assert_eq!(roundtrip, samples);
+    }
+}
+
 /// Application entry point shared by `main.rs` and mobile targets.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -281,8 +493,9 @@ pub fn run() {
     // installed (tests, hot reload) we simply keep the existing subscriber.
     let _ = tracing_subscriber::fmt()
         .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("nexus_mixer_lib=info,tauri=warn")),
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+                tracing_subscriber::EnvFilter::new("nexus_mixer_lib=info,tauri=warn")
+            }),
         )
         .with_target(false)
         .try_init();
@@ -290,6 +503,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_dialog::init())
         .manage(Arc::new(EngineState::new()))
         .invoke_handler(tauri::generate_handler![
             list_audio_devices,
@@ -309,6 +523,14 @@ pub fn run() {
             get_ai_status,
             ping_ai_sidecar,
             configure_ai_sidecar,
+            pad_load,
+            pad_unload,
+            pad_play,
+            pad_update,
+            pad_stop,
+            pad_stop_all,
+            pad_levels,
+            pad_loaded,
         ])
         .setup(|app| {
             let state = app.state::<Arc<EngineState>>();
@@ -323,8 +545,10 @@ pub fn run() {
             // --- tray icon ---------------------------------------------------
             // The window is frameless, so the tray is the only way back after
             // "close to tray". Menu items mirror the settings drawer switches.
-            let show_item = MenuItem::with_id(app, "tray-show", "Показать окно", true, None::<&str>)?;
-            let hide_item = MenuItem::with_id(app, "tray-hide", "Скрыть в трей", true, None::<&str>)?;
+            let show_item =
+                MenuItem::with_id(app, "tray-show", "Показать окно", true, None::<&str>)?;
+            let hide_item =
+                MenuItem::with_id(app, "tray-hide", "Скрыть в трей", true, None::<&str>)?;
             let quit_item = MenuItem::with_id(app, "tray-quit", "Выход", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show_item, &hide_item, &quit_item])?;
 

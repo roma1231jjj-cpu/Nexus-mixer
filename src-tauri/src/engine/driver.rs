@@ -14,7 +14,7 @@ use parking_lot::Mutex;
 use windows_sys::Win32::Foundation::ERROR_SUCCESS;
 use windows_sys::Win32::System::Registry::{
     RegCloseKey, RegEnumKeyExW, RegGetValueW, RegOpenKeyExW, HKEY, HKEY_LOCAL_MACHINE, KEY_READ,
-    RRF_RT_REG_SZ, REG_SZ,
+    REG_SZ, RRF_RT_REG_SZ,
 };
 
 use super::model::DriverStatus;
@@ -99,12 +99,11 @@ fn virtual_endpoints() -> Vec<(String, bool)> {
     let mut names = Vec::new();
 
     for (flow, render) in [("Render", true), ("Capture", false)] {
-        let base = format!(
-            r"SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\{flow}"
-        );
+        let base = format!(r"SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\{flow}");
         let key: Vec<u16> = base.encode_utf16().chain(std::iter::once(0)).collect();
         let mut handle: HKEY = std::ptr::null_mut();
-        let open = unsafe { RegOpenKeyExW(HKEY_LOCAL_MACHINE, key.as_ptr(), 0, KEY_READ, &mut handle) };
+        let open =
+            unsafe { RegOpenKeyExW(HKEY_LOCAL_MACHINE, key.as_ptr(), 0, KEY_READ, &mut handle) };
         if open != ERROR_SUCCESS {
             continue;
         }
@@ -226,7 +225,10 @@ fn read_string(key: &str, value: &str) -> Option<String> {
 }
 
 fn service_registered() -> bool {
-    let key: Vec<u16> = CABLE_SERVICE.encode_utf16().chain(std::iter::once(0)).collect();
+    let key: Vec<u16> = CABLE_SERVICE
+        .encode_utf16()
+        .chain(std::iter::once(0))
+        .collect();
     let mut handle: HKEY = std::ptr::null_mut();
     let open = unsafe { RegOpenKeyExW(HKEY_LOCAL_MACHINE, key.as_ptr(), 0, KEY_READ, &mut handle) };
     if open != ERROR_SUCCESS {

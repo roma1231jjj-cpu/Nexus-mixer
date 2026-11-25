@@ -14,11 +14,12 @@ pub mod ai;
 pub mod ai_audio;
 pub mod buffer;
 pub mod devices;
-pub mod dsp;
 #[cfg(windows)]
 pub mod driver;
+pub mod dsp;
 pub mod graph;
 pub mod model;
+pub mod pads;
 pub mod recorder;
 pub mod runtime;
 pub mod state;

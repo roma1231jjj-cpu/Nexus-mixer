@@ -2,7 +2,7 @@
  * Scene Snapshots — save & load full mixer state (all strips, buses, FX, routing)
  */
 
-import type { Bus, BusFx, EqBand, Strip, StripFx, VcaGroup } from '../types'
+import type { AiSettings, Bus, BusFx, EngineSettings, EqBand, Strip, StripFx, VcaGroup } from '../types'
 import { STRIP_ORDER, BUS_ORDER } from '../data/defaults'
 import type { MixerStore } from '../store/useMixer'
 
@@ -34,6 +34,11 @@ export interface SceneSnapshot {
   masterEqEnabled?: boolean
   masterGainDb?: number
   vcaGroups?: VcaGroup[]
+  /** Optional for snapshots created before devices/names/engine were captured. */
+  names?: { strips: Record<string, string>; buses: Record<string, string> }
+  devices?: { strips: Record<string, string>; buses: Record<string, string> }
+  engine?: EngineSettings
+  ai?: AiSettings
 }
 
 export type SceneStore = SceneSnapshot[]
@@ -74,6 +79,19 @@ export function captureSnapshot(name: string, state: MixerStore): SceneSnapshot 
     }
   }
 
+  const stripNames: Record<string, string> = {}
+  const stripDevices: Record<string, string> = {}
+  for (const id of STRIP_ORDER) {
+    stripNames[id] = state.strips[id].name
+    stripDevices[id] = state.strips[id].deviceId
+  }
+  const busNames: Record<string, string> = {}
+  const busDevices: Record<string, string> = {}
+  for (const id of BUS_ORDER) {
+    busNames[id] = state.buses[id].name
+    busDevices[id] = state.buses[id].deviceId
+  }
+
   return {
     id: `scene-${Date.now().toString(36)}`,
     name,
@@ -84,6 +102,10 @@ export function captureSnapshot(name: string, state: MixerStore): SceneSnapshot 
     masterEqEnabled: state.masterEqEnabled,
     masterGainDb: state.masterGainDb,
     vcaGroups: structuredClone(state.vcaGroups),
+    names: { strips: stripNames, buses: busNames },
+    devices: { strips: stripDevices, buses: busDevices },
+    engine: structuredClone(state.engine),
+    ai: structuredClone(state.ai),
   }
 }
 
@@ -104,6 +126,8 @@ export function applySnapshot(
     setMasterEqEnabled: (enabled: boolean) => void
     setMasterGainDb: (gainDb: number) => void
     setVcaGroups: (groups: VcaGroup[]) => void
+    setEngine: (patch: Partial<EngineSettings>) => void
+    setAi: (patch: Partial<AiSettings>) => void
   },
 ): string[] {
   const details: string[] = []
@@ -122,6 +146,8 @@ export function applySnapshot(
     }
     if (typeof data.cue === 'boolean') patch.cue = data.cue
     if (typeof data.phantom === 'boolean') patch.phantom = data.phantom
+    if (snapshot.names?.strips[id]) patch.name = snapshot.names.strips[id]
+    if (snapshot.devices?.strips[id] !== undefined) patch.deviceId = snapshot.devices.strips[id]
     if ('aiPresetId' in data) {
       patch.aiPresetId = typeof data.aiPresetId === 'string' ? data.aiPresetId : null
     }
@@ -144,6 +170,8 @@ export function applySnapshot(
     if (typeof snapshot.masterGainDb === 'number') ctx.setMasterGainDb(snapshot.masterGainDb)
   }
   if (snapshot.vcaGroups) ctx.setVcaGroups(structuredClone(snapshot.vcaGroups))
+  if (snapshot.engine) ctx.setEngine(structuredClone(snapshot.engine))
+  if (snapshot.ai) ctx.setAi(structuredClone(snapshot.ai))
 
   for (const id of BUS_ORDER) {
     const data = snapshot.buses[id]
@@ -153,6 +181,8 @@ export function applySnapshot(
       mute: data.mute,
       mono: data.mono,
       dim: data.dim,
+      ...(snapshot.names?.buses[id] ? { name: snapshot.names.buses[id] } : {}),
+      ...(snapshot.devices?.buses[id] !== undefined ? { deviceId: snapshot.devices.buses[id] } : {}),
     })
     ctx.setBusFx(id, structuredClone(data.fx) as BusFx)
     details.push(`${id}: restored`)
@@ -170,9 +200,14 @@ export function loadScenes(): SceneStore {
   } catch { return [] }
 }
 
-export function saveScenes(scenes: SceneStore): void {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(scenes)) }
-  catch { /* ignore */ }
+/** Returns false when the browser refused to store the scene list. */
+export function saveScenes(scenes: SceneStore): boolean {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(scenes))
+    return true
+  } catch {
+    return false
+  }
 }
 
 export function deleteScene(scenes: SceneStore, id: string): SceneStore {

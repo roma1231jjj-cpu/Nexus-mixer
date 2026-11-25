@@ -352,7 +352,16 @@ export interface RecorderStatus {
   file: string | null
   seconds: number
   droppedFrames: number
+  /** Last start/write error. Survives settings edits until a start succeeds. */
   error: string | null
+  /** Take notice: a stable code (`splitBySize`) or a backend message. */
+  notice: string | null
+  /** Buses of the take in progress, empty while no file is open. */
+  buses: BusId[]
+  /** Bit depth of the take in progress, 0 while no file is open. */
+  bitDepth: number
+  /** Settings were changed mid-take and apply to the next session. */
+  pendingChanges: boolean
 }
 
 export interface MixerState {

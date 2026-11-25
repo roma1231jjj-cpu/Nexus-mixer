@@ -115,7 +115,8 @@ impl Default for DriverStatus {
             test_mode: false,
             endpoints: 0,
             cable_endpoints: Vec::new(),
-            message: "Виртуальный кабель не найден — виртуальные шины работают в режиме эмуляции.".into(),
+            message: "Виртуальный кабель не найден — виртуальные шины работают в режиме эмуляции."
+                .into(),
         }
     }
 }

@@ -61,6 +61,9 @@ interface MixerActions {
   updateMacro: (id: string, patch: Partial<Macro>) => void
   removeMacro: (id: string) => void
   runMacro: (id: string) => void
+  /** Momentary macros: capture the state, apply, then restore on release. */
+  pressMacro: (id: string) => void
+  releaseMacro: (id: string) => void
 
   /** Reveal the next empty source slot and assign an input device. */
   addSource: (deviceId: string, name?: string) => StripId | null
@@ -92,6 +95,15 @@ const LEGACY_COLORS: Record<string, string> = {
 
 /** Move the old neon presets onto the muted studio palette once. */
 const migrateColor = (color: string): string => LEGACY_COLORS[color.toLowerCase()] ?? color
+
+/** Mute state captured before a PANIC press, restored by the next press. */
+let panicSnapshot: Record<StripId, Strip> | null = null
+
+/** Per-macro state captured while a momentary macro is held. */
+const momentarySnapshots = new Map<
+  string,
+  { strips: Record<StripId, Strip>; ai: MixerState['ai'] }
+>()
 
 const applyTheme = (theme: Theme) => {
   document.documentElement.dataset.theme = theme
@@ -342,9 +354,17 @@ export const useMixer = create<MixerStore>()(
         const action = macro.action
         switch (action.type) {
           case 'panic': {
-            const anyUnmuted = Object.values(state.strips).some((s) => !s.mute)
+            // Toggling "any unmuted -> mute everyone" lost the previous mute
+            // state: the second press unmuted microphones the user had muted
+            // on purpose. Remember the exact state and restore it instead.
+            if (panicSnapshot) {
+              set({ strips: panicSnapshot })
+              panicSnapshot = null
+              return
+            }
+            panicSnapshot = { ...state.strips }
             const strips = Object.fromEntries(
-              Object.entries(state.strips).map(([key, strip]) => [key, { ...strip, mute: anyUnmuted }]),
+              Object.entries(state.strips).map(([key, strip]) => [key, { ...strip, mute: true }]),
             ) as Record<StripId, Strip>
             set({ strips })
             break
@@ -374,6 +394,56 @@ export const useMixer = create<MixerStore>()(
             break
           }
         }
+      },
+
+      pressMacro: (id) => {
+        const state = get()
+        const macro = state.macros.find((m) => m.id === id)
+        if (!macro) return
+        // A held macro behaves like a hardware button: it *activates* its
+        // action, and releasing restores exactly what was there before.
+        momentarySnapshots.set(id, { strips: state.strips, ai: state.ai })
+        const action = macro.action
+        switch (action.type) {
+          case 'panic': {
+            const strips = Object.fromEntries(
+              Object.entries(state.strips).map(([key, strip]) => [key, { ...strip, mute: true }]),
+            ) as Record<StripId, Strip>
+            set({ strips })
+            break
+          }
+          case 'mute': {
+            if (!action.target) return
+            set({ strips: { ...state.strips, [action.target]: { ...state.strips[action.target], mute: true } } })
+            break
+          }
+          case 'route': {
+            if (!action.target || !action.bus) return
+            const strip = state.strips[action.target]
+            if (!strip.routing[action.bus]?.on) get().toggleRoute(action.target, action.bus)
+            break
+          }
+          case 'preset': {
+            if (typeof action.value === 'string') get().applyPreset(action.value, action.target)
+            break
+          }
+          case 'ai': {
+            set({ ai: { ...state.ai, enabled: true } })
+            break
+          }
+          case 'gain': {
+            if (!action.target || typeof action.value !== 'number') return
+            get().setStrip(action.target, { gainDb: action.value })
+            break
+          }
+        }
+      },
+
+      releaseMacro: (id) => {
+        const snapshot = momentarySnapshots.get(id)
+        if (!snapshot) return
+        momentarySnapshots.delete(id)
+        set({ strips: snapshot.strips, ai: snapshot.ai })
       },
 
       setVcaGain: (groupId, gainDb) =>

@@ -60,6 +60,9 @@ const matchesShortcut = (event: KeyboardEvent, shortcut: string): boolean => {
   return event.key.toLowerCase() === key
 }
 
+/** Momentary macros currently held down through a keyboard shortcut. */
+const heldMacros = new Set<string>()
+
 export default function App() {
   useEngineBridge()
   const t = useT()
@@ -173,7 +176,16 @@ export default function App() {
       for (const macro of macros) {
         if (macro.shortcut && matchesShortcut(event, macro.shortcut)) {
           event.preventDefault()
-          runMacro(macro.id)
+          if (event.repeat) return
+          if (macro.momentary) {
+            // A held macro must act on keydown and release on keyup; auto-repeat
+            // used to fire the action dozens of times per second.
+            if (heldMacros.has(macro.id)) return
+            heldMacros.add(macro.id)
+            useMixer.getState().pressMacro(macro.id)
+          } else {
+            runMacro(macro.id)
+          }
           return
         }
       }
@@ -188,8 +200,23 @@ export default function App() {
         return
       }
     }
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (isTyping(event.target)) return
+      for (const macro of macros) {
+        if (macro.momentary && macro.shortcut && matchesShortcut(event, macro.shortcut)) {
+          if (!heldMacros.has(macro.id)) return
+          heldMacros.delete(macro.id)
+          useMixer.getState().releaseMacro(macro.id)
+          return
+        }
+      }
+    }
     window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
+    window.addEventListener('keyup', onKeyUp)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keyup', onKeyUp)
+    }
   }, [macros, runMacro, setSettingsOpen, setMatrixOpen, lang])
 
   return (

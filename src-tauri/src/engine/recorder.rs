@@ -1,12 +1,28 @@
 //! Post-fader WAV recorder.
 //!
-//! The audio callback pushes the five processed stereo buses into a lock-free
-//! ring; a dedicated writer thread drains it, selects the buses requested by
-//! the UI and writes a standard PCM/float WAV file. No allocation, file I/O or
+//! The audio callback pushes the fifteen processed stereo buses into a lock-free
+//! ring; a dedicated writer thread drains it, selects the buses requested by the
+//! UI and writes a standard PCM/float WAV file. No allocation, file I/O or
 //! locking happens on the realtime thread.
 //!
+//! Settings are split in two groups:
+//!
+//! * `enabled` is the transport flag. Turning it on opens the file, turning it
+//!   off drains the queue and finalizes the header. It is the only thing that
+//!   may start a new file.
+//! * everything else (buses, bit depth, folder, split interval) is a session
+//!   setting. It is snapshotted when the file is opened, so editing it during a
+//!   take never restarts or fragments the file — it applies to the next
+//!   session. `RecorderStatus::pending_changes` tells the UI about that.
+//!
+//! Segments roll over automatically before the RIFF 4 GiB limit, even when
+//! time-based splitting is off, and the roll happens on an exact frame
+//! boundary so nothing is repeated or skipped.
+//!
+//! An empty bus mask is an error: it never falls back to A1.
+//!
 //! v0.1 deliberately supports WAV only. FLAC/MP3 are accepted by the UI but
-//! are written as WAV with an explanatory status message until encoders land.
+//! are written as WAV with an explanatory status notice until encoders land.
 
 use std::cell::UnsafeCell;
 use std::fs::{create_dir_all, File};
@@ -20,10 +36,26 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 
-use super::graph::{BUS_IDS, BUSES};
+use super::graph::{BUSES, BUS_IDS};
 
-/// Interleaved stereo samples per captured frame: all five buses.
+/// Interleaved stereo samples per captured frame: all buses.
 pub const TAP_CHANNELS: usize = BUSES * 2;
+
+/// Frames pulled from the ring per writer wake-up.
+const BATCH_FRAMES: usize = 4_096;
+/// Bytes buffered before one `write` call reaches the `BufWriter`.
+const FLUSH_BYTES: usize = 256 * 1024;
+
+/// A RIFF data chunk stores its size in a 32-bit field, and the RIFF chunk size
+/// (`36 + data`) is 32-bit too, so the payload is capped 36 bytes below the
+/// type limit. Anything above overflows the header.
+const RIFF_MAX_DATA_BYTES: u64 = 0xFFFF_FFFF - 36;
+/// Segments roll this far below the hard limit, so a final drain of the queue
+/// can never push a segment over the limit.
+const RIFF_ROLL_MARGIN_BYTES: u64 = 16 * 1024 * 1024;
+
+/// Status notice code: the file was split because it reached the RIFF limit.
+pub const NOTICE_SPLIT_BY_SIZE: &str = "splitBySize";
 
 // ---------------------------------------------------------------------------
 // UI wire format
@@ -61,6 +93,15 @@ pub struct RecorderStatus {
     pub seconds: f64,
     pub dropped_frames: u64,
     pub error: Option<String>,
+    /// Notice for the current take: a stable code (`splitBySize`) or a
+    /// ready-to-show backend message.
+    pub notice: Option<String>,
+    /// Buses of the take in progress, empty when no file is open.
+    pub buses: Vec<String>,
+    /// Bit depth of the take in progress, 0 when no file is open.
+    pub bit_depth: u16,
+    /// The UI settings differ from the running take and apply after it stops.
+    pub pending_changes: bool,
 }
 
 impl Default for RecorderStatus {
@@ -71,6 +112,10 @@ impl Default for RecorderStatus {
             seconds: 0.0,
             dropped_frames: 0,
             error: None,
+            notice: None,
+            buses: Vec::new(),
+            bit_depth: 0,
+            pending_changes: false,
         }
     }
 }
@@ -145,8 +190,81 @@ impl RecorderRing {
         true
     }
 
+    /// Frames waiting in the ring right now.
+    fn queued(&self) -> u64 {
+        let tail = self.tail.load(Ordering::Acquire);
+        let head = self.head.load(Ordering::Relaxed);
+        tail.wrapping_sub(head)
+    }
+
     fn dropped(&self) -> u64 {
         self.dropped.load(Ordering::Relaxed)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Session snapshot
+// ---------------------------------------------------------------------------
+
+/// Settings frozen when a file is opened. Changing the UI settings afterwards
+/// leaves this untouched until the next session starts.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SessionSpec {
+    mask: u32,
+    bits: u16,
+    sample_rate: u32,
+    split_minutes: u32,
+    directory: String,
+    format: String,
+}
+
+impl SessionSpec {
+    fn selected(&self) -> Vec<usize> {
+        (0..BUSES)
+            .filter(|index| self.mask & (1 << index) != 0)
+            .collect()
+    }
+
+    fn channels(&self) -> u16 {
+        self.selected().len() as u16 * 2
+    }
+
+    fn frame_bytes(&self) -> u64 {
+        self.channels() as u64 * self.bits as u64 / 8
+    }
+
+    fn bus_ids(&self) -> Vec<String> {
+        bus_ids(self.mask)
+    }
+}
+
+fn bus_mask(buses: &[String]) -> u32 {
+    let mut mask = 0u32;
+    for bus in buses {
+        if let Some(index) = BUS_IDS.iter().position(|id| id == bus) {
+            mask |= 1 << index;
+        }
+    }
+    mask
+}
+
+fn bus_ids(mask: u32) -> Vec<String> {
+    BUS_IDS
+        .iter()
+        .enumerate()
+        .filter(|(index, _)| mask & (1 << index) != 0)
+        .map(|(_, id)| (*id).to_string())
+        .collect()
+}
+
+fn format_notice(spec: &SessionSpec) -> Option<String> {
+    if spec.format.eq_ignore_ascii_case("wav") {
+        None
+    } else {
+        Some(format!(
+            "формат {} пока не поддерживается — пишется WAV",
+            spec.format.to_uppercase()
+        ))
     }
 }
 
@@ -156,8 +274,12 @@ impl RecorderRing {
 
 struct Shared {
     shutdown: AtomicBool,
+    /// Bumped only when the user explicitly starts recording, or when a start
+    /// that already failed may be retried with the corrected settings.
     generation: AtomicU64,
     enabled: AtomicBool,
+    /// Set when the last start attempt could not open a file.
+    start_failed: AtomicBool,
     bus_mask: AtomicU32,
     bit_depth: AtomicU32,
     split_minutes: AtomicU32,
@@ -166,6 +288,9 @@ struct Shared {
     format: Mutex<String>,
     file: Mutex<Option<String>>,
     error: Mutex<Option<String>>,
+    notice: Mutex<Option<String>>,
+    /// Spec of the take in progress; `None` while no file is open.
+    active: Mutex<Option<SessionSpec>>,
     recording: AtomicBool,
     frames_written: AtomicU64,
 }
@@ -176,6 +301,7 @@ impl Shared {
             shutdown: AtomicBool::new(false),
             generation: AtomicU64::new(0),
             enabled: AtomicBool::new(false),
+            start_failed: AtomicBool::new(false),
             bus_mask: AtomicU32::new(1),
             bit_depth: AtomicU32::new(24),
             split_minutes: AtomicU32::new(0),
@@ -184,29 +310,39 @@ impl Shared {
             format: Mutex::new("wav".into()),
             file: Mutex::new(None),
             error: Mutex::new(None),
+            notice: Mutex::new(None),
+            active: Mutex::new(None),
             recording: AtomicBool::new(false),
             frames_written: AtomicU64::new(0),
         }
     }
 
     fn apply(&self, params: &RecorderParams) {
-        let mut mask = 0u32;
-        for bus in &params.buses {
-            if let Some(index) = BUS_IDS.iter().position(|id| id == bus) {
-                mask |= 1 << index;
-            }
-        }
-        if mask == 0 {
-            mask = 1; // A1 is always a safe default.
-        }
-        self.enabled.store(params.enabled, Ordering::Release);
+        let before = self.pending_spec();
+        // An empty mask is stored as-is: the writer refuses to open a file and
+        // reports it instead of silently recording A1.
+        let mask = bus_mask(&params.buses);
+        let was_enabled = self.enabled.swap(params.enabled, Ordering::AcqRel);
         self.bus_mask.store(mask, Ordering::Release);
-        self.bit_depth.store(params.bit_depth as u32, Ordering::Release);
-        self.split_minutes.store(params.split_minutes, Ordering::Release);
+        self.bit_depth
+            .store(params.bit_depth as u32, Ordering::Release);
+        self.split_minutes
+            .store(params.split_minutes, Ordering::Release);
         *self.directory.lock() = params.directory.clone();
         *self.format.lock() = params.format.clone();
-        *self.error.lock() = None;
-        self.generation.fetch_add(1, Ordering::AcqRel);
+
+        // The last error is deliberately left alone: only a successful start
+        // (or the user) may clear it.
+        if params.enabled && !was_enabled {
+            self.generation.fetch_add(1, Ordering::AcqRel);
+        } else if params.enabled
+            && self.start_failed.load(Ordering::Acquire)
+            && before != self.pending_spec()
+        {
+            // No file is open (the start failed), so correcting the settings
+            // may retry instead of waiting for another click.
+            self.generation.fetch_add(1, Ordering::AcqRel);
+        }
     }
 
     fn enabled(&self) -> bool {
@@ -233,15 +369,39 @@ impl Shared {
         self.sample_rate.load(Ordering::Acquire)
     }
 
+    /// Settings as they are in the UI right now; used for the next session and
+    /// to tell the UI that the running take uses older values.
+    fn pending_spec(&self) -> SessionSpec {
+        SessionSpec {
+            mask: self.mask(),
+            bits: self.bits(),
+            sample_rate: self.sample_rate().max(1),
+            split_minutes: self.split_minutes(),
+            directory: self.directory.lock().clone(),
+            format: self.format.lock().clone(),
+        }
+    }
+
     fn status(&self) -> RecorderStatus {
         let frames = self.frames_written.load(Ordering::Relaxed);
         let rate = self.sample_rate().max(1) as f64;
+        let active = self.active.lock().clone();
+        let pending_changes = active
+            .as_ref()
+            .is_some_and(|spec| *spec != self.pending_spec());
         RecorderStatus {
             recording: self.recording.load(Ordering::Acquire),
             file: self.file.lock().clone(),
             seconds: frames as f64 / rate,
             dropped_frames: 0,
             error: self.error.lock().clone(),
+            notice: self.notice.lock().clone(),
+            buses: active
+                .as_ref()
+                .map(SessionSpec::bus_ids)
+                .unwrap_or_default(),
+            bit_depth: active.as_ref().map_or(0, |spec| spec.bits),
+            pending_changes,
         }
     }
 }
@@ -283,8 +443,8 @@ impl RecorderHandle {
         Arc::clone(&self.ring)
     }
 
-    /// Apply UI settings. Duplicate snapshots are ignored, so dragging a fader
-    /// does not restart an active recording.
+    /// Apply UI settings. Identical snapshots are ignored. Session settings are
+    /// stored for the next take; a take in progress keeps its own snapshot.
     pub fn configure(&self, params: RecorderParams) {
         let mut last = self.last.lock();
         if *last == params {
@@ -304,7 +464,9 @@ impl RecorderHandle {
     /// WAV header and the "seconds" counter before recording starts.
     pub fn set_sample_rate(&self, sample_rate: u32) {
         if sample_rate > 0 {
-            self.shared.sample_rate.store(sample_rate, Ordering::Release);
+            self.shared
+                .sample_rate
+                .store(sample_rate, Ordering::Release);
         }
     }
 }
@@ -322,107 +484,99 @@ impl Drop for RecorderHandle {
 // Writer thread
 // ---------------------------------------------------------------------------
 
+/// A segment roll that the control block has to publish.
+struct RollEvent {
+    reason: RollReason,
+    path: String,
+}
+
 fn writer_loop(shared: Arc<Shared>, ring: Arc<RecorderRing>) {
-    let mut last_generation = 0u64;
-    let mut writer: Option<WavWriter> = None;
-    let mut split_index = 0u32;
+    // Starts at zero on purpose: `Shared` is constructed with generation 0, so
+    // any bump is a start request that happened after this handle was built.
+    // Reading the live value here would race the first `configure` and drop the
+    // start request of a recording armed before the thread was scheduled.
+    let mut seen_start = 0u64;
+    let mut session: Option<Session> = None;
     let mut frame = [0.0f32; TAP_CHANNELS];
-    let mut bytes = Vec::with_capacity(4_096 * TAP_CHANNELS * 4);
 
     loop {
         let shutting_down = shared.shutdown.load(Ordering::Acquire);
         let generation = shared.generation.load(Ordering::Acquire);
+        let requested = shared.enabled();
 
-        if generation != last_generation {
-            last_generation = generation;
-            writer = None;
-            *shared.file.lock() = None;
-            shared.frames_written.store(0, Ordering::Relaxed);
-            split_index = 0;
-            if shared.enabled() {
-                match WavWriter::open(&shared, &ring) {
-                    Ok((next, path)) => {
-                        writer = Some(next);
+        if generation != seen_start {
+            // A start request is the only reason to open a file. Anything that
+            // was still running is closed first, with its queue drained.
+            seen_start = generation;
+            if let Some(active) = session.take() {
+                close_session(&shared, active, &ring, &mut frame);
+            }
+            shared.recording.store(false, Ordering::Release);
+
+            if requested {
+                // Frames captured before the request must not land in the file.
+                discard_ring(&ring, &mut frame);
+                let spec = shared.pending_spec();
+                match Session::open(&spec) {
+                    Ok((opened, path)) => {
                         *shared.file.lock() = Some(path);
+                        *shared.notice.lock() = format_notice(&spec);
+                        *shared.error.lock() = None;
+                        *shared.active.lock() = Some(spec);
+                        shared.start_failed.store(false, Ordering::Release);
+                        shared.frames_written.store(0, Ordering::Relaxed);
                         shared.recording.store(true, Ordering::Release);
+                        session = Some(opened);
                     }
                     Err(error) => {
+                        *shared.file.lock() = None;
                         *shared.error.lock() = Some(error);
+                        *shared.active.lock() = None;
+                        shared.start_failed.store(true, Ordering::Release);
                         shared.recording.store(false, Ordering::Release);
                     }
                 }
-            } else {
-                shared.recording.store(false, Ordering::Release);
             }
         }
 
-        if let Some(mut active) = writer.take() {
-            bytes.clear();
-            let mut frames_in_batch = 0usize;
-            let mut split_reached = false;
-            while frames_in_batch < 4_096 {
-                if !ring.pop_frame(&mut frame) {
-                    break;
-                }
-                active.push_frame(&mut bytes, &frame);
-                frames_in_batch += 1;
-                if active.split_at.is_some_and(|limit| active.frames >= limit) {
-                    split_reached = true;
-                    break;
-                }
-            }
-
-            let mut write_error = None;
-            if !bytes.is_empty() {
-                match active.write_bytes(&bytes) {
-                    Ok(()) => shared
-                        .frames_written
-                        .store(active.frames, Ordering::Relaxed),
-                    Err(error) => write_error = Some(error),
-                }
-            }
-
-            if let Some(error) = write_error {
-                *shared.error.lock() = Some(error);
-                *shared.file.lock() = None;
-                shared.recording.store(false, Ordering::Release);
-            } else if split_reached {
-                // `active` is dropped here and finalizes the segment.
-                split_index += 1;
-                shared.frames_written.store(0, Ordering::Relaxed);
-                match WavWriter::open_split(&shared, &ring, split_index) {
-                    Ok((next, path)) => {
-                        writer = Some(next);
-                        *shared.file.lock() = Some(path);
-                    }
-                    Err(error) => {
-                        *shared.error.lock() = Some(error);
-                        shared.recording.store(false, Ordering::Release);
+        let mut failed = false;
+        if session.is_some() && !requested {
+            // Stop requested: drain what the callback already pushed, then
+            // finalize the header. Nothing is written after this point.
+            let finished = session.take().expect("session checked above");
+            close_session(&shared, finished, &ring, &mut frame);
+        } else if let Some(active) = session.as_mut() {
+            match active.pump(&ring, &mut frame, BATCH_FRAMES) {
+                Ok(Some(event)) => {
+                    *shared.file.lock() = Some(event.path);
+                    if event.reason == RollReason::Size {
+                        *shared.notice.lock() = Some(NOTICE_SPLIT_BY_SIZE.into());
                     }
                 }
-            } else {
-                writer = Some(active);
+                Ok(None) => {}
+                Err(error) => {
+                    *shared.error.lock() = Some(error);
+                    failed = true;
+                }
             }
+            shared
+                .frames_written
+                .store(active.total_frames(), Ordering::Relaxed);
         } else {
-            // Discard stale audio while idle so enabling recording never
-            // replays old samples.
-            let mut discarded = 0;
-            while discarded < 8_192 && ring.pop_frame(&mut frame) {
-                discarded += 1;
+            // Idle: drop whatever the tap pushed so a later start never
+            // replays stale audio.
+            discard_ring(&ring, &mut frame);
+        }
+
+        if failed {
+            if let Some(broken) = session.take() {
+                close_session(&shared, broken, &ring, &mut frame);
             }
         }
 
         if shutting_down {
-            // One last drain so the final few milliseconds reach disk.
-            if let Some(mut active) = writer.take() {
-                bytes.clear();
-                while ring.pop_frame(&mut frame) {
-                    active.push_frame(&mut bytes, &frame);
-                }
-                if !bytes.is_empty() {
-                    let _ = active.write_bytes(&bytes);
-                }
-                shared.frames_written.store(active.frames, Ordering::Relaxed);
+            if let Some(active) = session.take() {
+                close_session(&shared, active, &ring, &mut frame);
             }
             break;
         }
@@ -434,45 +588,238 @@ fn writer_loop(shared: Arc<Shared>, ring: Arc<RecorderRing>) {
     shared.shutdown.store(true, Ordering::Release);
 }
 
+/// Drain the queue into the file, finalize the header and publish the result.
+/// Used for a normal stop, an error, a replaced session and shutdown.
+fn close_session(
+    shared: &Shared,
+    session: Session,
+    ring: &RecorderRing,
+    frame: &mut [f32; TAP_CHANNELS],
+) {
+    let (total, drain_error) = session.drain_and_finish(ring, frame);
+    shared.frames_written.store(total, Ordering::Relaxed);
+    if let Some(error) = drain_error {
+        let mut slot = shared.error.lock();
+        if slot.is_none() {
+            *slot = Some(error);
+        }
+    }
+    *shared.active.lock() = None;
+    shared.recording.store(false, Ordering::Release);
+}
+
+/// Throw away queued frames (bounded, so a fast tap cannot starve the loop).
+fn discard_ring(ring: &RecorderRing, frame: &mut [f32; TAP_CHANNELS]) {
+    let limit = ring.queued().min(65_536);
+    let mut discarded = 0;
+    while discarded < limit && ring.pop_frame(frame) {
+        discarded += 1;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// One recording session
+// ---------------------------------------------------------------------------
+
+/// Owns the current segment, the frame counter and the byte buffer. Kept free
+/// of thread and control-block access so it can be driven directly in tests.
+struct Session {
+    writer: WavWriter,
+    /// Timestamp stem shared by every segment of this session.
+    base: u64,
+    segment: u32,
+    total_frames: u64,
+    bytes: Vec<u8>,
+}
+
+impl Session {
+    fn open(spec: &SessionSpec) -> Result<(Self, String), String> {
+        let base = unix_timestamp_ms();
+        let (writer, path) = WavWriter::open_session(spec, base, 0)?;
+        Ok((Self::wrap(writer, base), path))
+    }
+
+    fn wrap(writer: WavWriter, base: u64) -> Self {
+        Self {
+            writer,
+            base,
+            segment: 0,
+            total_frames: 0,
+            bytes: Vec::with_capacity(FLUSH_BYTES),
+        }
+    }
+
+    fn total_frames(&self) -> u64 {
+        self.total_frames
+    }
+
+    /// Move up to `budget` queued frames into the file. Returns the new segment
+    /// when the segment rolled over.
+    fn pump(
+        &mut self,
+        ring: &RecorderRing,
+        frame: &mut [f32; TAP_CHANNELS],
+        budget: usize,
+    ) -> Result<Option<RollEvent>, String> {
+        let mut written = 0usize;
+        let mut roll = None;
+        while written < budget {
+            if !ring.pop_frame(frame) {
+                break;
+            }
+            if self.writer.would_overflow(self.bytes.len()) {
+                let _ = self.flush();
+                return Err("достигнут предел размера RIFF: кадр не помещается в файл".into());
+            }
+            self.writer.push_frame(&mut self.bytes, frame);
+            self.total_frames += 1;
+            written += 1;
+            if self.writer.segment_full() {
+                roll = Some(self.writer.roll_reason());
+                break;
+            }
+        }
+        self.flush()?;
+        match roll {
+            Some(reason) => Ok(Some(self.roll(reason)?)),
+            None => Ok(None),
+        }
+    }
+
+    /// Close the current segment and open the next one. The switch happens on
+    /// an exact frame boundary: the frame that filled the old segment is the
+    /// last one in it, the next frame is the first one in the new file.
+    fn roll(&mut self, reason: RollReason) -> Result<RollEvent, String> {
+        self.flush()?;
+        self.writer.finalize();
+        // The segment counter only advances once the new file really exists.
+        let next = self.segment + 1;
+        let (writer, path) = self.writer.reopen(self.base, next)?;
+        self.writer = writer;
+        self.segment = next;
+        Ok(RollEvent { reason, path })
+    }
+
+    fn flush(&mut self) -> Result<(), String> {
+        if self.bytes.is_empty() {
+            return Ok(());
+        }
+        let result = self.writer.write_bytes(&self.bytes);
+        self.bytes.clear();
+        result
+    }
+
+    /// Write everything that was already queued when the take ended, then
+    /// finalize the header. Returns the total frame count and a drain error.
+    fn drain_and_finish(
+        mut self,
+        ring: &RecorderRing,
+        frame: &mut [f32; TAP_CHANNELS],
+    ) -> (u64, Option<String>) {
+        let queued = ring.queued();
+        let mut drained = 0u64;
+        let mut error = None;
+        while drained < queued && ring.pop_frame(frame) {
+            if self.writer.would_overflow(self.bytes.len()) {
+                error =
+                    Some("достигнут предел размера RIFF: хвост записи не поместился в файл".into());
+                break;
+            }
+            self.writer.push_frame(&mut self.bytes, frame);
+            self.total_frames += 1;
+            drained += 1;
+        }
+        if let Err(flush_error) = self.flush() {
+            if error.is_none() {
+                error = Some(flush_error);
+            }
+        }
+        self.writer.finalize();
+        (self.total_frames, error)
+    }
+
+    /// Test hook: open a session with an explicit segment size limit and no
+    /// time limit, so the roll logic can be exercised without 4 GiB of data.
+    #[cfg(test)]
+    fn open_with_segment_limit(
+        spec: &SessionSpec,
+        segment_frames: u64,
+    ) -> Result<(Self, String), String> {
+        let base = unix_timestamp_ms();
+        let (writer, path) = WavWriter::open_with_limits(spec, base, 0, segment_frames, None)?;
+        Ok((Self::wrap(writer, base), path))
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Minimal WAV writer (PCM 16/24, IEEE float 32)
 // ---------------------------------------------------------------------------
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RollReason {
+    Time,
+    Size,
+}
+
 struct WavWriter {
     file: BufWriter<File>,
+    spec: SessionSpec,
     channels: u16,
-    sample_rate: u32,
     bits: u16,
     format_tag: u16,
+    frame_bytes: u64,
     data_bytes: u64,
     frames: u64,
-    split_at: Option<u64>,
+    /// Frames per segment: the smaller of the time split and the RIFF limit.
+    segment_frames: u64,
+    /// Frames implied by the RIFF limit; kept so every segment of a session
+    /// uses the same limit.
+    size_segment_frames: u64,
+    /// Frames implied by `split_minutes`, `None` when time splitting is off.
+    time_segment_frames: Option<u64>,
     selected: Vec<usize>,
+    /// Data size that is currently written into the header, so a finalized
+    /// segment that receives a late drain is re-finalized instead of skipped.
+    header_bytes: u64,
 }
 
 impl WavWriter {
-    fn open(shared: &Shared, _ring: &RecorderRing) -> Result<(Self, String), String> {
-        Self::open_split(shared, _ring, 0)
+    fn open_session(spec: &SessionSpec, base: u64, segment: u32) -> Result<(Self, String), String> {
+        if spec.selected().is_empty() {
+            return Err("выберите хотя бы одну шину для записи".into());
+        }
+        let size_frames =
+            ((RIFF_MAX_DATA_BYTES - RIFF_ROLL_MARGIN_BYTES) / spec.frame_bytes().max(1)).max(1);
+        let time_frames = match spec.split_minutes {
+            0 => None,
+            minutes => Some(minutes as u64 * 60 * spec.sample_rate.max(1) as u64),
+        };
+        Self::open_with_limits(spec, base, segment, size_frames, time_frames)
     }
 
-    fn open_split(shared: &Shared, _ring: &RecorderRing, split_index: u32) -> Result<(Self, String), String> {
-        let mask = shared.mask();
-        let selected: Vec<usize> = (0..BUSES).filter(|index| mask & (1 << index) != 0).collect();
-        if selected.is_empty() {
-            return Err("не выбрано ни одной шины для записи".into());
+    fn open_with_limits(
+        spec: &SessionSpec,
+        base: u64,
+        segment: u32,
+        size_frames: u64,
+        time_frames: Option<u64>,
+    ) -> Result<(Self, String), String> {
+        if spec.selected().is_empty() {
+            return Err("выберите хотя бы одну шину для записи".into());
         }
-
-        let base = unix_timestamp_ms();
-        let suffix = if split_index == 0 {
+        let channels = spec.channels();
+        let bits = spec.bits;
+        let format_tag = if bits == 32 { 3 } else { 1 };
+        let suffix = if segment == 0 {
             String::new()
         } else {
-            format!("-{split_index}")
+            format!("-{segment}")
         };
 
         // Some Windows profiles redirect or protect the Music known folder.
         // Try the requested location first, then fall back to LocalAppData so
         // recording never fails just because the default folder is unavailable.
-        let requested = recording_directory(&shared.directory.lock());
+        let requested = recording_directory(&spec.directory);
         let (file, path) = match open_recording_file(&requested, base, &suffix) {
             Ok(result) => result,
             Err(first_error) => {
@@ -486,47 +833,67 @@ impl WavWriter {
                 })?
             }
         };
-        let mut writer = BufWriter::with_capacity(64 * 1024, file);
-
-        let bits = shared.bits();
-        let format_tag = if bits == 32 { 3 } else { 1 };
+        let mut file = BufWriter::with_capacity(64 * 1024, file);
         write_header(
-            writer.get_mut(),
-            selected.len() as u16 * 2,
-            shared.sample_rate(),
+            file.get_mut(),
+            channels,
+            spec.sample_rate,
             bits,
             format_tag,
             0,
         )
         .map_err(|error| format!("не удалось записать WAV-заголовок: {error}"))?;
 
-        let split_at = match shared.split_minutes() {
-            0 => None,
-            minutes => Some(minutes as u64 * 60 * shared.sample_rate() as u64),
-        };
-
-        let format = shared.format.lock().clone();
-        if format != "wav" {
-            *shared.error.lock() = Some(format!(
-                "формат {} пока не поддерживается — записываю WAV",
-                format.to_uppercase()
-            ));
-        }
+        let segment_frames = time_frames
+            .map_or(size_frames, |time| time.min(size_frames))
+            .max(1);
 
         Ok((
             Self {
-                file: writer,
-                channels: selected.len() as u16 * 2,
-                sample_rate: shared.sample_rate(),
+                file,
+                spec: spec.clone(),
+                channels,
                 bits,
                 format_tag,
+                frame_bytes: channels as u64 * bits as u64 / 8,
                 data_bytes: 0,
                 frames: 0,
-                split_at,
-                selected,
+                segment_frames,
+                size_segment_frames: size_frames,
+                time_segment_frames: time_frames,
+                selected: spec.selected(),
+                header_bytes: 0,
             },
             path.display().to_string(),
         ))
+    }
+
+    /// Open the next segment with the same limits as this one.
+    fn reopen(&self, base: u64, segment: u32) -> Result<(Self, String), String> {
+        Self::open_with_limits(
+            &self.spec,
+            base,
+            segment,
+            self.size_segment_frames,
+            self.time_segment_frames,
+        )
+    }
+
+    /// True when the next frame would have to go to a fresh file.
+    fn segment_full(&self) -> bool {
+        self.frames >= self.segment_frames
+    }
+
+    fn roll_reason(&self) -> RollReason {
+        match self.time_segment_frames {
+            Some(time) if time <= self.segment_frames => RollReason::Time,
+            _ => RollReason::Size,
+        }
+    }
+
+    /// Hard RIFF ceiling; only reachable if a segment was never rolled.
+    fn would_overflow(&self, pending_bytes: usize) -> bool {
+        self.data_bytes + pending_bytes as u64 + self.frame_bytes > RIFF_MAX_DATA_BYTES
     }
 
     fn push_frame(&mut self, out: &mut Vec<u8>, frame: &[f32; TAP_CHANNELS]) {
@@ -545,17 +912,25 @@ impl WavWriter {
         Ok(())
     }
 
+    /// Write the real data size into the header and leave the file cursor at the
+    /// end of the payload, so a segment that receives more data afterwards (a
+    /// drain after a failed roll) appends instead of overwriting the take.
     fn finalize(&mut self) {
+        if self.header_bytes == self.data_bytes {
+            return;
+        }
+        self.header_bytes = self.data_bytes;
         let _ = self.file.flush();
         let file = self.file.get_mut();
         let _ = write_header(
             file,
             self.channels,
-            self.sample_rate,
+            self.spec.sample_rate,
             self.bits,
             self.format_tag,
             self.data_bytes,
         );
+        let _ = file.seek(SeekFrom::Start(44 + self.data_bytes));
         let _ = file.sync_all();
     }
 }
@@ -628,7 +1003,7 @@ fn write_header(
     let bytes_per_sample = bits / 8;
     let block_align = channels * bytes_per_sample;
     let byte_rate = sample_rate * block_align as u32;
-    let data_size = data_bytes.min(u32::MAX as u64) as u32;
+    let data_size = data_bytes.min(RIFF_MAX_DATA_BYTES) as u32;
 
     file.seek(SeekFrom::Start(0))?;
     file.write_all(b"RIFF")?;
@@ -651,6 +1026,43 @@ fn write_header(
 mod tests {
     use super::*;
     use std::path::Path;
+
+    fn temp_directory(tag: &str) -> PathBuf {
+        std::env::temp_dir().join(format!(
+            "nexus-recorder-{tag}-{}-{}",
+            std::process::id(),
+            unix_timestamp_ms()
+        ))
+    }
+
+    fn float_spec(directory: &Path) -> SessionSpec {
+        SessionSpec {
+            mask: 1,
+            bits: 32,
+            sample_rate: 48_000,
+            split_minutes: 0,
+            directory: directory.display().to_string(),
+            format: "wav".into(),
+        }
+    }
+
+    /// Read a 32-bit float WAV and verify the header matches the payload.
+    fn read_float_wav(path: &Path) -> Vec<f32> {
+        let bytes = std::fs::read(path).expect("wav file");
+        assert_eq!(&bytes[0..4], b"RIFF");
+        assert_eq!(&bytes[8..12], b"WAVE");
+        assert_eq!(u16::from_le_bytes([bytes[34], bytes[35]]), 32);
+        let data_size = u32::from_le_bytes([bytes[40], bytes[41], bytes[42], bytes[43]]) as usize;
+        assert_eq!(
+            data_size + 44,
+            bytes.len(),
+            "header data size does not match the payload"
+        );
+        bytes[44..]
+            .chunks_exact(4)
+            .map(|chunk| f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
+            .collect()
+    }
 
     #[test]
     fn ring_roundtrips_a_frame() {
@@ -688,6 +1100,17 @@ mod tests {
     }
 
     #[test]
+    fn empty_bus_mask_is_kept_empty() {
+        let shared = Shared::new(48_000);
+        shared.apply(&RecorderParams {
+            enabled: true,
+            buses: Vec::new(),
+            ..RecorderParams::default()
+        });
+        assert_eq!(shared.mask(), 0, "an empty mask must not fall back to A1");
+    }
+
+    #[test]
     fn configured_directory_is_used() {
         let path = recording_directory("C:/Temp/Nexus");
         assert_eq!(path, Path::new("C:/Temp/Nexus"));
@@ -695,11 +1118,7 @@ mod tests {
 
     #[test]
     fn writer_creates_a_valid_wav_file() {
-        let directory = std::env::temp_dir().join(format!(
-            "nexus-recorder-test-{}-{}",
-            std::process::id(),
-            unix_timestamp_ms()
-        ));
+        let directory = temp_directory("basic");
         let handle = RecorderHandle::new(48_000);
         let tap = handle.tap();
         let params = RecorderParams {
@@ -720,6 +1139,9 @@ mod tests {
 
         let status = handle.status();
         assert!(status.recording, "writer did not start: {status:?}");
+        assert!(status.error.is_none(), "unexpected error: {status:?}");
+        assert_eq!(status.buses, vec!["A1".to_string()]);
+        assert_eq!(status.bit_depth, 24);
         let path = status.file.expect("file path");
         handle.configure(RecorderParams {
             enabled: false,
@@ -732,5 +1154,364 @@ mod tests {
         assert_eq!(&bytes[0..4], b"RIFF");
         assert_eq!(&bytes[8..12], b"WAVE");
         let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    #[test]
+    fn stop_drains_the_queue_tail_into_the_file() {
+        // Every frame pushed after the take was confirmed must survive the
+        // stop: the writer may not finalize the header before the queue is
+        // empty (this is the "lost tail" defect).
+        let directory = temp_directory("drain");
+        let handle = RecorderHandle::new(48_000);
+        let tap = handle.tap();
+        let params = RecorderParams {
+            enabled: true,
+            directory: directory.display().to_string(),
+            format: "wav".into(),
+            bit_depth: 32,
+            buses: vec!["A1".into()],
+            split_minutes: 0,
+        };
+        handle.configure(params.clone());
+        let mut status = handle.status();
+        for _ in 0..100 {
+            if status.recording {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+            status = handle.status();
+        }
+        assert!(status.recording, "writer did not start: {status:?}");
+
+        let frames = 20_000u32;
+        let mut frame = [0.0f32; TAP_CHANNELS];
+        for index in 0..frames {
+            frame[0] = index as f32 / frames as f32;
+            frame[1] = -(index as f32 / frames as f32);
+            assert!(tap.push_frame(&frame), "tap overflowed at {index}");
+        }
+        // Stop right away, without giving the writer a chance to drain first.
+        handle.configure(RecorderParams {
+            enabled: false,
+            ..params
+        });
+        let mut settled = handle.status();
+        for _ in 0..100 {
+            if !settled.recording {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+            settled = handle.status();
+        }
+        let path = settled.file.clone().expect("file path");
+        let seconds = settled.seconds;
+        drop(handle);
+
+        let samples = read_float_wav(Path::new(&path));
+        assert_eq!(
+            samples.len(),
+            frames as usize * 2,
+            "tail frames are missing"
+        );
+        assert_eq!(samples[0], 0.0);
+        let last = (frames - 1) as f32 / frames as f32;
+        assert_eq!(samples[samples.len() - 2], last);
+        assert_eq!(samples[samples.len() - 1], -last);
+        assert!(
+            (seconds - frames as f64 / 48_000.0).abs() < 0.001,
+            "status seconds {seconds} does not match the frame count"
+        );
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    #[test]
+    fn drain_moves_the_whole_queue_and_finalizes_the_header() {
+        let directory = temp_directory("drain-unit");
+        let spec = float_spec(&directory);
+        let (session, path) =
+            Session::open_with_segment_limit(&spec, u64::MAX / 1024).expect("open session");
+        let ring = RecorderRing::new(1_024);
+        let mut frame = [0.0f32; TAP_CHANNELS];
+        let frames = 500u32;
+        for index in 0..frames {
+            frame[0] = index as f32 / frames as f32;
+            frame[1] = -(index as f32 / frames as f32);
+            assert!(ring.push_frame(&frame));
+        }
+
+        let (total, error) = session.drain_and_finish(&ring, &mut frame);
+        assert_eq!(total, frames as u64);
+        assert!(error.is_none(), "{error:?}");
+
+        let samples = read_float_wav(Path::new(&path));
+        assert_eq!(samples.len(), frames as usize * 2);
+        let last = (frames - 1) as f32 / frames as f32;
+        assert_eq!(samples[samples.len() - 2], last);
+        assert_eq!(samples[samples.len() - 1], -last);
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    #[test]
+    fn finalize_can_be_repeated_after_more_frames_are_written() {
+        // A segment may be finalized and still receive frames (drain after a
+        // failed roll). The payload must be appended, not overwritten, and the
+        // header must be brought up to date.
+        let directory = temp_directory("refinalize");
+        let spec = float_spec(&directory);
+        let (writer, path) =
+            WavWriter::open_session(&spec, unix_timestamp_ms(), 0).expect("open segment");
+        let mut session = Session::wrap(writer, 0);
+        let mut bytes = Vec::new();
+        let mut frame = [0.0f32; TAP_CHANNELS];
+        for index in 0..5u32 {
+            frame[0] = index as f32 / 64.0;
+            session.writer.push_frame(&mut bytes, &frame);
+        }
+        session.writer.write_bytes(&bytes).expect("write");
+        session.writer.finalize();
+        assert_eq!(read_float_wav(Path::new(&path)).len(), 10);
+
+        let mut bytes = Vec::new();
+        for index in 5..10u32 {
+            frame[0] = index as f32 / 64.0;
+            session.writer.push_frame(&mut bytes, &frame);
+        }
+        session.writer.write_bytes(&bytes).expect("write");
+        session.writer.finalize();
+        drop(session);
+
+        let samples = read_float_wav(Path::new(&path));
+        assert_eq!(samples.len(), 20);
+        assert_eq!(samples[0], 0.0);
+        assert_eq!(samples[18], 9.0 / 64.0);
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    #[test]
+    fn riff_size_limit_rolls_to_a_new_file_without_gaps() {
+        let directory = temp_directory("roll");
+        let spec = float_spec(&directory);
+        // 10 frames per segment: one bus, 32-bit float => 80 bytes of payload.
+        let (mut session, first) =
+            Session::open_with_segment_limit(&spec, 10).expect("open session");
+        let ring = RecorderRing::new(256);
+        let mut frame = [0.0f32; TAP_CHANNELS];
+        let ramp = |index: u32| index as f32 / 64.0;
+        for index in 0..25u32 {
+            frame[0] = ramp(index);
+            frame[1] = -ramp(index);
+            assert!(ring.push_frame(&frame));
+        }
+
+        let mut segments = vec![first];
+        let mut rolls = Vec::new();
+        while ring.queued() > 0 {
+            if let Some(event) = session.pump(&ring, &mut frame, BATCH_FRAMES).expect("pump") {
+                assert_eq!(event.reason, RollReason::Size);
+                rolls.push(event.path.clone());
+                segments.push(event.path);
+            }
+        }
+        let (total, error) = session.drain_and_finish(&ring, &mut frame);
+        assert_eq!(total, 25);
+        assert!(error.is_none(), "{error:?}");
+        assert_eq!(segments.len(), 3, "expected 10 + 10 + 5 frames");
+        assert_eq!(rolls.len(), 2);
+
+        // Concatenating the segments must reproduce the input exactly: no
+        // frame written twice, none skipped.
+        let mut samples = Vec::new();
+        for path in &segments {
+            samples.extend(read_float_wav(Path::new(path)));
+        }
+        assert_eq!(samples.len(), 50);
+        for index in 0..25usize {
+            assert_eq!(samples[index * 2], ramp(index as u32), "frame {index} left");
+            assert_eq!(
+                samples[index * 2 + 1],
+                -ramp(index as u32),
+                "frame {index} right"
+            );
+        }
+        assert_eq!(read_float_wav(Path::new(&segments[0])).len(), 20);
+        assert_eq!(read_float_wav(Path::new(&segments[1])).len(), 20);
+        assert_eq!(read_float_wav(Path::new(&segments[2])).len(), 10);
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    #[test]
+    fn parameter_changes_do_not_restart_an_active_take() {
+        let directory = temp_directory("live-params");
+        let other = temp_directory("live-params-other");
+        let handle = RecorderHandle::new(48_000);
+        let tap = handle.tap();
+        let params = RecorderParams {
+            enabled: true,
+            directory: directory.display().to_string(),
+            format: "wav".into(),
+            bit_depth: 24,
+            buses: vec!["A1".into()],
+            split_minutes: 0,
+        };
+        handle.configure(params.clone());
+        let mut status = handle.status();
+        for _ in 0..100 {
+            if status.recording {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+            status = handle.status();
+        }
+        assert!(status.recording, "writer did not start: {status:?}");
+        let first_file = status.file.clone().expect("file path");
+
+        let frame = [0.05f32; TAP_CHANNELS];
+        for _ in 0..480 {
+            tap.push_frame(&frame);
+        }
+        std::thread::sleep(Duration::from_millis(60));
+
+        // Every session setting at once, exactly what the UI does when the
+        // user edits the panel mid-take.
+        handle.configure(RecorderParams {
+            enabled: true,
+            directory: other.display().to_string(),
+            format: "wav".into(),
+            bit_depth: 32,
+            buses: vec!["A1".into(), "B1".into()],
+            split_minutes: 15,
+        });
+        for _ in 0..480 {
+            tap.push_frame(&frame);
+        }
+        std::thread::sleep(Duration::from_millis(120));
+
+        let during = handle.status();
+        assert_eq!(
+            during.file.as_deref(),
+            Some(first_file.as_str()),
+            "file was replaced"
+        );
+        assert!(during.recording);
+        assert_eq!(during.bit_depth, 24, "take bit depth changed mid-file");
+        assert_eq!(
+            during.buses,
+            vec!["A1".to_string()],
+            "take buses changed mid-file"
+        );
+        assert!(
+            during.pending_changes,
+            "UI must be told about deferred settings"
+        );
+        assert!(
+            during.seconds >= 0.009,
+            "frame counter was reset: {during:?}"
+        );
+
+        handle.configure(RecorderParams {
+            enabled: false,
+            ..params.clone()
+        });
+        let mut settled = handle.status();
+        for _ in 0..100 {
+            if !settled.recording {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+            settled = handle.status();
+        }
+        assert!(settled.error.is_none(), "unexpected error: {settled:?}");
+        drop(handle);
+
+        let bytes = std::fs::read(&first_file).expect("wav file");
+        assert_eq!(u16::from_le_bytes([bytes[34], bytes[35]]), 24);
+        let data_size = u32::from_le_bytes([bytes[40], bytes[41], bytes[42], bytes[43]]) as usize;
+        assert_eq!(data_size + 44, bytes.len());
+        assert!(
+            !Path::new(&other).exists(),
+            "a second file was opened inside the same take"
+        );
+        let _ = std::fs::remove_dir_all(&directory);
+        let _ = std::fs::remove_dir_all(&other);
+    }
+
+    #[test]
+    fn empty_bus_mask_fails_the_start_and_keeps_the_error() {
+        let directory = temp_directory("empty-mask");
+        let handle = RecorderHandle::new(48_000);
+        let tap = handle.tap();
+        let params = RecorderParams {
+            enabled: true,
+            directory: directory.display().to_string(),
+            format: "wav".into(),
+            bit_depth: 24,
+            buses: Vec::new(),
+            split_minutes: 0,
+        };
+        handle.configure(params.clone());
+        let tap_frame = [0.2f32; TAP_CHANNELS];
+        for _ in 0..480 {
+            tap.push_frame(&tap_frame);
+        }
+        std::thread::sleep(Duration::from_millis(150));
+
+        let failed = handle.status();
+        assert!(!failed.recording, "recording started with an empty mask");
+        assert!(failed.file.is_none());
+        let error = failed.error.clone().expect("start error");
+        assert!(error.contains("шину"), "unexpected error: {error}");
+
+        // Disarming and editing the settings must not wipe the error.
+        handle.configure(RecorderParams {
+            enabled: false,
+            ..params.clone()
+        });
+        std::thread::sleep(Duration::from_millis(120));
+        let disarmed = handle.status();
+        assert_eq!(
+            disarmed.error.as_deref(),
+            Some(error.as_str()),
+            "a settings update wiped the error"
+        );
+
+        // A start with a valid mask succeeds and clears it.
+        handle.configure(RecorderParams {
+            enabled: true,
+            directory: directory.display().to_string(),
+            format: "wav".into(),
+            bit_depth: 24,
+            buses: vec!["A1".into()],
+            split_minutes: 0,
+        });
+        std::thread::sleep(Duration::from_millis(200));
+        let recovered = handle.status();
+        assert!(
+            recovered.recording,
+            "retry after fixing the mask failed: {recovered:?}"
+        );
+        assert!(
+            recovered.error.is_none(),
+            "a successful start must clear the error"
+        );
+
+        handle.configure(RecorderParams {
+            enabled: false,
+            ..params
+        });
+        drop(handle);
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    #[test]
+    fn error_survives_parameter_updates() {
+        let shared = Shared::new(48_000);
+        *shared.error.lock() = Some("диск заполнен".into());
+        shared.apply(&RecorderParams {
+            enabled: false,
+            buses: vec!["A1".into(), "A2".into()],
+            bit_depth: 16,
+            ..RecorderParams::default()
+        });
+        assert_eq!(shared.status().error.as_deref(), Some("диск заполнен"));
     }
 }
