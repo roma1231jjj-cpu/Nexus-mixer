@@ -116,7 +116,11 @@ try {
     draft = $false
     prerelease = $false
   } | ConvertTo-Json -Depth 5
-  $release = Invoke-RestMethod -Method Post -Uri "https://api.github.com/repos/$repo/releases" -Headers $headers -Body $body -ContentType "application/json"
+  # Windows PowerShell 5.1 serialises a string body as ISO-8859-1, which turns
+  # Cyrillic into "?" and makes GitHub answer "Problems parsing JSON". Send the
+  # body as explicit UTF-8 bytes instead.
+  $bodyBytes = [Text.Encoding]::UTF8.GetBytes($body)
+  $release = Invoke-RestMethod -Method Post -Uri "https://api.github.com/repos/$repo/releases" -Headers $headers -Body $bodyBytes -ContentType "application/json; charset=utf-8"
   Write-Host "Created release $tag" -ForegroundColor Green
 }
 
