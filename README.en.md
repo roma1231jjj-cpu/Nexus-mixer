@@ -172,16 +172,15 @@ Plus the **PITCH / FORMANT / MIX** knobs, a source picker and the
 **OFF / DSP / AI / HYBRID** modes. Real RVC models still go through the local Python
 sidecar — it is optional for the built-in voices.
 
-### Auto-update
+### Updates
 
-- Update check on launch.
-- A signed NSIS package downloads in the background.
-- An **"Install and restart"** button.
-- Manual check: **Settings → Updates**.
-- Manifest: [`latest.json`](https://github.com/roma1231jjj-cpu/Nexus-mixer/releases/latest/download/latest.json).
-
-Updates are signed with a Tauri Updater key. The public key lives in
-`src-tauri/tauri.conf.json`, the private one only in GitHub Actions Secrets.
+- Update check on launch and manually: **Settings → Updates**.
+- **0.5.1 is built without updater artifacts:** the Tauri Updater private key
+  is unavailable, so `latest.json` cannot be signed. Updating 0.5.0 → 0.5.1 is
+  manual — install 0.5.1 over the old version.
+- When the owner restores `TAURI_SIGNING_PRIVATE_KEY`, rebuild NSIS and publish
+  a signed `latest.json`; the public key in `src-tauri/tauri.conf.json` still
+  matches existing installs.
 
 ### More
 
@@ -205,9 +204,9 @@ and are grouped by version.
 
 | Format | File | Purpose |
 | --- | --- | --- |
-| Installer | `Nexus-Mixer_0.4.0_x64-setup.exe` | regular install, auto-update |
-| Single portable | `Nexus-Mixer_0.4.0_x64-portable.exe` | run without installing |
-| Portable archive | `Nexus-Mixer-0.4.0-portable.zip` | portable `.exe` + README |
+| Installer | `Nexus-Mixer_0.5.1_x64-setup.exe` | regular install |
+| Single portable | `Nexus-Mixer_0.5.1_x64-portable.exe` | run without installing |
+| Portable archive | `Nexus-Mixer-0.5.1-portable.zip` | portable `.exe` + README |
 
 Inside the project the artifacts go to `release/vX.Y.Z/` and never mix with working
 files. The layout is described in [release/README.md](release/README.md).
@@ -220,8 +219,9 @@ files. The layout is described in [release/README.md](release/README.md).
 4. For virtual cables install **Virtual Audio Cable 4.70** (12 lines). Without it the
    physical outputs work, but the virtual buses stay unavailable.
 
-The installer puts the app into `%LOCALAPPDATA%` (or a folder of your choice) and
-supports auto-update. The portable build is updated manually.
+The installer puts the app into `%LOCALAPPDATA%` (or a folder of your choice).
+Auto-update is paused in 0.5.1 (see “Updates”); the portable build is always
+updated manually.
 
 ---
 
@@ -244,25 +244,25 @@ npm run typecheck
 npm run build
 ```
 
-A full release build with updater artifacts:
+Build without updater signing (current 0.5.1 mode):
+
+```powershell
+npx tauri build --no-bundle    # raw exe for the portable build
+npx tauri build --bundles nsis # NSIS only, no .sig/latest.json
+```
+
+Build with auto-update (only when the private key is available):
 
 ```powershell
 $env:TAURI_SIGNING_PRIVATE_KEY = "C:\path\to\nexus-updater.key"
 $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = ""
-npx tauri build --no-bundle    # raw exe for the portable build
+npx tauri build --no-bundle
 npx tauri build --bundles nsis # NSIS + .sig + latest.json
 ```
 
-Or in one command:
-
-```powershell
-$env:GITHUB_TOKEN = "..."
-$env:TAURI_SIGNING_PRIVATE_KEY = "C:\path\to\nexus-updater.key"
-powershell -ExecutionPolicy Bypass -File scripts/release.ps1
-```
-
-The script builds all three formats, puts them into `release/vX.Y.Z/`, computes
-SHA-256, creates the GitHub Release and uploads `latest.json` for auto-update.
+`scripts/release.ps1` builds all three formats, puts them into
+`release/vX.Y.Z/`, computes SHA-256, creates the GitHub Release and uploads a
+signed `latest.json` only when the key is present.
 
 ### Tests
 

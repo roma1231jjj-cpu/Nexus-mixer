@@ -1,7 +1,7 @@
 {
   "name": "nexus-mixer",
   "private": true,
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Nexus-Mixer — virtual audio mixer with AI voice presets. Nexus × АутSquad",
   "type": "module",
   "scripts": {

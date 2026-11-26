@@ -62,6 +62,8 @@ const matchesShortcut = (event: KeyboardEvent, shortcut: string): boolean => {
 
 /** Momentary macros currently held down through a keyboard shortcut. */
 const heldMacros = new Set<string>()
+/** Keyboard code that pressed each held macro, so keyup works even if Ctrl was released first. */
+const heldMacroCodes = new Map<string, string>()
 
 export default function App() {
   useEngineBridge()
@@ -182,6 +184,7 @@ export default function App() {
             // used to fire the action dozens of times per second.
             if (heldMacros.has(macro.id)) return
             heldMacros.add(macro.id)
+            heldMacroCodes.set(event.code || event.key.toLowerCase(), macro.id)
             useMixer.getState().pressMacro(macro.id)
           } else {
             runMacro(macro.id)
@@ -201,21 +204,26 @@ export default function App() {
       }
     }
     const onKeyUp = (event: KeyboardEvent) => {
-      if (isTyping(event.target)) return
-      for (const macro of macros) {
-        if (macro.momentary && macro.shortcut && matchesShortcut(event, macro.shortcut)) {
-          if (!heldMacros.has(macro.id)) return
-          heldMacros.delete(macro.id)
-          useMixer.getState().releaseMacro(macro.id)
-          return
-        }
-      }
+      // Match the physical key that was pressed, not the current modifiers:
+      // releasing Ctrl before "1" used to leave the macro stuck on.
+      const id = heldMacroCodes.get(event.code || event.key.toLowerCase())
+      if (!id) return
+      heldMacroCodes.delete(event.code || event.key.toLowerCase())
+      heldMacros.delete(id)
+      useMixer.getState().releaseMacro(id)
+    }
+    const releaseAll = () => {
+      for (const id of heldMacros) useMixer.getState().releaseMacro(id)
+      heldMacros.clear()
+      heldMacroCodes.clear()
     }
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('keyup', onKeyUp)
+    window.addEventListener('blur', releaseAll)
     return () => {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
+      window.removeEventListener('blur', releaseAll)
     }
   }, [macros, runMacro, setSettingsOpen, setMatrixOpen, lang])
 

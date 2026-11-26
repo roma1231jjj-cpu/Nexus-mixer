@@ -146,11 +146,9 @@ function normalizeDevices(devices: AudioDevice[]): void {
       // assigns a device to one.
       if (cableNumber > 2 && !bus.deviceId) continue
       const expected = virtualOutputs.find((device) => cableIndex(device.name) === cableNumber)
-      const currentDevice = bus.deviceId
-        ? devices.find((device) => device.id === bus.deviceId)
-        : undefined
-      const currentIsLegacy = Boolean(currentDevice && cableIndex(currentDevice.name) === null)
-      const force = remapCables || !bus.deviceId || !known.has(bus.deviceId) || currentIsLegacy
+      // Do not replace a manual Bn assignment just because it is not the
+      // "expected" numbered cable; only migration or a missing/empty slot does.
+      const force = remapCables || !bus.deviceId || !known.has(bus.deviceId)
 
       if (expected && !usedOutputs.has(expected.id) && force) {
         usedOutputs.add(expected.id)
@@ -237,7 +235,7 @@ function normalizeDevices(devices: AudioDevice[]): void {
 
   if (stripsChanged) useMixer.setState({ strips })
   if (busesChanged) useMixer.setState({ buses })
-  if (remapCables && numberedCables.size > 0) {
+  if (remapCables) {
     try {
       localStorage.setItem(CABLE_PLAN_KEY, '1')
     } catch {
@@ -293,6 +291,7 @@ export function useEngineBridge(): void {
     let restarting = false
     let lastRestartAt = 0
     let deviceRestartTimer: number | undefined
+    let missingDevices = new Set<string>()
 
     const pushSnapshot = () => {
       const state = useMixer.getState()
@@ -338,7 +337,12 @@ export function useEngineBridge(): void {
 
         // Detect losses *before* normalization rewrites the assignments.
         const known = new Set(devices.map((device) => device.id))
-        const lost = referencedDevices().filter((id) => !known.has(id))
+        const referenced = referencedDevices()
+        const lost = referenced.filter((id) => !known.has(id))
+        // A device that came back needs a graph rebuild too: normalization
+        // kept its id while it was gone, so the plan did not change.
+        const returned = [...missingDevices].filter((id) => known.has(id) && referenced.includes(id))
+        missingDevices = new Set(lost)
 
         normalizeDevices(devices)
         useMixer.setState({ devices })
@@ -361,7 +365,7 @@ export function useEngineBridge(): void {
           }
         }
 
-        if (lost.length > 0 && devices.length > 0) {
+        if ((lost.length > 0 || returned.length > 0) && devices.length > 0) {
           maybeRestart(t('engine.reasonLost'))
         }
       })

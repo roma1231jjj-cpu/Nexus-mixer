@@ -84,6 +84,8 @@ export function SoundPlayer() {
   const padStatesRef = useRef<Record<string, SoundPadState>>({})
   const masterRef = useRef(masterVolume)
   const engineRunningRef = useRef(engineRunning)
+  /** Set once syncEngineBank exists; a late decode calls it again. */
+  const syncEngineRef = useRef<() => void>(() => {})
 
   samplesRef.current = samples
   padStatesRef.current = padStates
@@ -121,6 +123,8 @@ export function SoundPlayer() {
           if (cancelled) return
           buffersRef.current[sample.id] = decoded.buffer
           setMissing((prev) => ({ ...prev, [sample.id]: false }))
+          // The first bank sync may have run before this decode finished.
+          syncEngineRef.current()
         } catch {
           if (!cancelled) {
             setMissing((prev) => ({ ...prev, [sample.id]: true }))
@@ -184,6 +188,10 @@ export function SoundPlayer() {
       await uploadToEngine(sample.id, buffer)
     }
   }, [uploadToEngine])
+
+  syncEngineRef.current = () => {
+    if (engineBridge.available) void syncEngineBank()
+  }
 
   useEffect(() => {
     if (!engineBridge.available) return
@@ -257,6 +265,8 @@ export function SoundPlayer() {
         setMissing((prev) => ({ ...prev, [id]: false }))
         await uploadToEngine(id, decoded.buffer)
       } catch {
+        // Do not leave an invisible blob behind when decoding failed.
+        if (stored) await deleteSampleBlob(id)
         notify(t('pad.decodeFailed', { name: file.name }))
       }
     }
@@ -305,7 +315,10 @@ export function SoundPlayer() {
       const ctx = getPreviewCtx()
       const decoded = await decodeAudioBlob(id, file.name.replace(/\.[^/.]+$/, ''), file, ctx)
       buffersRef.current[id] = decoded.buffer
-      await saveSampleBlob(id, file)
+      if (!(await saveSampleBlob(id, file))) {
+        notify(t('pad.storageFailed'))
+        return
+      }
       setMissing((prev) => ({ ...prev, [id]: false }))
       setSamples((prev) =>
         prev.map((sample) =>
@@ -352,7 +365,9 @@ export function SoundPlayer() {
       const ctx = getPreviewCtx()
       stopPreview(sample.id)
       const nodes = playPreview(ctx, buffer, previewDestination(), {
-        volume: sample.volume * masterRef.current,
+        // previewGain already carries the master level; applying it twice
+        // made 50% master sound like 25%.
+        volume: sample.volume,
         pan: sample.pan,
         loop: sample.loop,
         pitchShift: sample.pitchShift,
@@ -479,10 +494,10 @@ export function SoundPlayer() {
         } else if (state?.playing && state.gainNode && state.pannerNode) {
           // Preview nodes accept volume and pan live; loop and pitch need a new
           // source node, so the voice is restarted at the current settings.
-          state.gainNode.gain.value = updated.volume * masterRef.current
+          state.gainNode.gain.value = updated.volume
           state.pannerNode.pan.value = updated.pan
           const restart =
-            (patch.loop !== undefined && patch.loop !== !state.sourceNode?.loop) ||
+            (patch.loop !== undefined && patch.loop !== state.sourceNode?.loop) ||
             patch.pitchShift !== undefined
           if (restart) {
             const buffer = buffersRef.current[id]

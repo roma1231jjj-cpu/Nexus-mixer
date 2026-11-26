@@ -163,13 +163,13 @@ const makeStrip = (id: StripId, patch: Partial<Strip>): Strip => ({
 export const makeStrips = (): Record<StripId, Strip> => ({
   hw1: makeStrip('hw1', {
     name: t('data.strip.mic'),
-    deviceId: 'in:mic-usb',
+    deviceId: '',
     color: '#c8a15a',
     fx: makeVelvetVoiceFx(),
   }),
   hw2: makeStrip('hw2', {
     name: t('data.strip.music'),
-    deviceId: 'in:line',
+    deviceId: '',
     color: '#b98a72',
   }),
   hw3: makeStrip('hw3', {
@@ -194,12 +194,12 @@ export const makeStrips = (): Record<StripId, Strip> => ({
   }),
   vaio: makeStrip('vaio', {
     name: t('data.strip.system'),
-    deviceId: 'in:vaio-out',
+    deviceId: '',
     color: '#8f9a7a',
   }),
   aux: makeStrip('aux', {
     name: t('data.strip.game'),
-    deviceId: 'in:aux-out',
+    deviceId: '',
     color: '#a98fa0',
   }),
 })
@@ -220,11 +220,11 @@ const makeBus = (id: BusId, patch: Partial<Bus>): Bus => ({
 
 export const makeBuses = (): Record<BusId, Bus> => {
   const busDefs: Partial<Record<BusId, Partial<Bus>>> = {
-    A1: { name: t('data.bus.hp1'), deviceId: 'out:speakers', color: '#c8a15a' },
+    A1: { name: t('data.bus.hp1'), deviceId: '', color: '#c8a15a' },
     A2: { name: t('data.bus.hp2'), deviceId: '', color: '#8f9a7a' },
     A3: { name: t('data.bus.speakers'), deviceId: '', color: '#7f97a8' },
-    B1: { name: t('data.bus.stream'), deviceId: 'out:vaio', color: '#b98a72', fx: makeBusFx({ width: 100 }) },
-    B2: { name: t('data.bus.cable2'), deviceId: 'out:aux', color: '#7f97a8' },
+    B1: { name: t('data.bus.stream'), deviceId: '', color: '#b98a72', fx: makeBusFx({ width: 100 }) },
+    B2: { name: t('data.bus.cable2'), deviceId: '', color: '#7f97a8' },
     B3: { name: t('data.bus.cable3'), color: '#8f9a7a' },
     B4: { name: t('data.bus.cable4'), color: '#a98fa0' },
     B5: { name: t('data.bus.cable5'), color: '#c8a15a' },

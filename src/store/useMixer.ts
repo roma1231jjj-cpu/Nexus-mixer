@@ -9,6 +9,7 @@ import type {
   EngineSettings,
   EqBand,
   Macro,
+  MacroAction,
   MixerState,
   Preset,
   RecorderSettings,
@@ -96,13 +97,13 @@ const LEGACY_COLORS: Record<string, string> = {
 /** Move the old neon presets onto the muted studio palette once. */
 const migrateColor = (color: string): string => LEGACY_COLORS[color.toLowerCase()] ?? color
 
-/** Mute state captured before a PANIC press, restored by the next press. */
-let panicSnapshot: Record<StripId, Strip> | null = null
+/** Mute states captured before a PANIC press, restored by the next press. */
+let panicSnapshot: Record<StripId, boolean> | null = null
 
 /** Per-macro state captured while a momentary macro is held. */
 const momentarySnapshots = new Map<
   string,
-  { strips: Record<StripId, Strip>; ai: MixerState['ai'] }
+  { strips: Record<StripId, Strip>; ai: MixerState['ai']; action: MacroAction }
 >()
 
 const applyTheme = (theme: Theme) => {
@@ -358,11 +359,22 @@ export const useMixer = create<MixerStore>()(
             // state: the second press unmuted microphones the user had muted
             // on purpose. Remember the exact state and restore it instead.
             if (panicSnapshot) {
-              set({ strips: panicSnapshot })
+              // Restore only mute, so channel edits made after PANIC survive.
+              const mutes = panicSnapshot
+              set((current) => ({
+                strips: Object.fromEntries(
+                  Object.entries(current.strips).map(([key, strip]) => [
+                    key,
+                    { ...strip, mute: mutes[key as StripId] ?? strip.mute },
+                  ]),
+                ) as Record<StripId, Strip>,
+              }))
               panicSnapshot = null
               return
             }
-            panicSnapshot = { ...state.strips }
+            panicSnapshot = Object.fromEntries(
+              Object.entries(state.strips).map(([key, strip]) => [key, strip.mute]),
+            ) as Record<StripId, boolean>
             const strips = Object.fromEntries(
               Object.entries(state.strips).map(([key, strip]) => [key, { ...strip, mute: true }]),
             ) as Record<StripId, Strip>
@@ -402,7 +414,7 @@ export const useMixer = create<MixerStore>()(
         if (!macro) return
         // A held macro behaves like a hardware button: it *activates* its
         // action, and releasing restores exactly what was there before.
-        momentarySnapshots.set(id, { strips: state.strips, ai: state.ai })
+        momentarySnapshots.set(id, { strips: state.strips, ai: state.ai, action: macro.action })
         const action = macro.action
         switch (action.type) {
           case 'panic': {
@@ -443,6 +455,58 @@ export const useMixer = create<MixerStore>()(
         const snapshot = momentarySnapshots.get(id)
         if (!snapshot) return
         momentarySnapshots.delete(id)
+        const action = snapshot.action
+        // A momentary button owns only the parameters it changed; restoring the
+        // whole strip map would silently undo unrelated edits made while held.
+        if (action.type === 'panic') {
+          set((current) => ({
+            strips: Object.fromEntries(
+              Object.entries(current.strips).map(([key, strip]) => [
+                key,
+                { ...strip, mute: snapshot.strips[key as StripId]?.mute ?? strip.mute },
+              ]),
+            ) as Record<StripId, Strip>,
+          }))
+          return
+        }
+        if (action.type === 'mute' || action.type === 'gain') {
+          if (!action.target) return
+          const before = snapshot.strips[action.target]
+          if (!before) return
+          set((current) => ({
+            strips: {
+              ...current.strips,
+              [action.target as StripId]: {
+                ...current.strips[action.target as StripId],
+                ...(action.type === 'mute' ? { mute: before.mute } : { gainDb: before.gainDb }),
+              },
+            },
+          }))
+          return
+        }
+        if (action.type === 'route') {
+          if (!action.target || !action.bus) return
+          const before = snapshot.strips[action.target]?.routing[action.bus]
+          if (!before) return
+          set((current) => {
+            const strip = current.strips[action.target as StripId]
+            return {
+              strips: {
+                ...current.strips,
+                [action.target as StripId]: {
+                  ...strip,
+                  routing: { ...strip.routing, [action.bus as string]: before },
+                },
+              },
+            }
+          })
+          return
+        }
+        if (action.type === 'ai') {
+          set({ ai: snapshot.ai })
+          return
+        }
+        // Presets may touch many fields; fall back to the full snapshot.
         set({ strips: snapshot.strips, ai: snapshot.ai })
       },
 

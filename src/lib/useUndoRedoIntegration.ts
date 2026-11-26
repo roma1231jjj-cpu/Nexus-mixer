@@ -32,13 +32,15 @@ export function useUndoRedoIntegration() {
     const state = useMixer.getState()
     fingerprintRef.current = mixerFingerprint(state)
 
-    const unsubscribe = useMixer.subscribe((next) => {
+    const unsubscribe = useMixer.subscribe((next, previous) => {
       if (applyingRef.current) return
       const fingerprint = mixerFingerprint(next)
       if (fingerprint === fingerprintRef.current) return
       // Remember only the state before the first change of this burst.
+      // Zustand gives us the previous state; reading the store here would
+      // already contain the change and make the first Ctrl+Z a no-op.
       if (!pendingRef.current) {
-        pendingRef.current = captureMixer(useMixer.getState())
+        pendingRef.current = captureMixer(previous)
       }
       fingerprintRef.current = fingerprint
       if (timerRef.current) window.clearTimeout(timerRef.current)
