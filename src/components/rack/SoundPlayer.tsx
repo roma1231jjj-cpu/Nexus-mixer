@@ -426,7 +426,12 @@ export function SoundPlayer() {
       if (engineRunningRef.current && enginePads[sample.id]) {
         void engineBridge.padPlay(sample.id, paramsOf(sample, delayMs)).then((result) => {
           if (result.ok) {
-            setPadState(sample.id, { playing: true, engine: true, level: 0 })
+            setPadState(sample.id, {
+              playing: true,
+              engine: true,
+              level: 0,
+              startedAt: Date.now(),
+            })
             return
           }
           // Engine refused (halted between polls, sample not uploaded, …):
@@ -544,12 +549,22 @@ export function SoundPlayer() {
             const state = next[id]
             if (!state.engine) continue
             const level = levels[id] ?? 0
+            const sample = samplesRef.current.find((item) => item.id === id)
+            const elapsed = state.startedAt ? Date.now() - state.startedAt : 0
+            // A silent or very short one-shot may end between two polls while
+            // its peak never became > 0. Fall back to the sample duration so
+            // the pad cannot stay "playing" forever.
+            const finished =
+              Boolean(sample) &&
+              !sample?.loop &&
+              (sample?.duration ?? 0) > 0 &&
+              elapsed > (sample?.duration ?? 0) * 1000 + 250
             if (level > 0 && !state.playing) {
-              next[id] = { ...state, playing: true, level }
+              next[id] = { ...state, playing: true, level, startedAt: state.startedAt ?? Date.now() }
               changed = true
-            } else if (level <= 0 && state.playing && state.level > 0) {
+            } else if ((level <= 0 && state.level > 0) || finished) {
               // One-shot finished: the engine no longer reports a peak.
-              next[id] = { ...state, playing: false, level: 0 }
+              next[id] = { ...state, playing: false, level: 0, startedAt: undefined }
               changed = true
             } else if (Math.abs(level - state.level) > 0.01) {
               next[id] = { ...state, level }

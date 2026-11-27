@@ -72,7 +72,7 @@ export const chrome: Chrome = {
   'status.stopTip': 'Stop the audio engine',
   'status.apiTip': 'Audio API',
   'status.rateTip': 'Sample rate / buffer',
-  'status.latencyTip': 'Latency',
+  'status.latencyTip': 'Latency (estimate)',
   'status.cpuTip': 'CPU load',
   'status.xrunTip': 'Dropouts (should be 0)',
   'status.cable': 'cable',

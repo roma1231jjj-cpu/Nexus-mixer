@@ -96,16 +96,18 @@ impl EngineState {
         )
         .map_err(|error| format!("{error:#}"))?;
         let info = runtime.info().clone();
-        // `stop_engine` bumps the generation before dropping the runtime. If it
-        // happened while WASAPI was still opening endpoints, this start is
-        // already obsolete: close what we just opened and report it.
+        self.set_config(config);
+        let mut guard = self.runtime.lock();
+        // `stop_engine` bumps the generation before dropping the runtime. Check
+        // it under the same lock that installs the runtime: otherwise a stop
+        // between the check and the assignment sees `None`, returns, and this
+        // start installs an obsolete engine after it.
         if self.generation.load(Ordering::SeqCst) != generation {
+            drop(guard);
             drop(runtime);
             self.pads.detach();
             return Err("запуск отменён: движок остановили во время открытия устройств".into());
         }
-        self.set_config(config);
-        let mut guard = self.runtime.lock();
         if let Some(existing) = guard.as_ref() {
             return Ok(existing.info().clone());
         }

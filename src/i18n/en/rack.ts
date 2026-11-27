@@ -272,4 +272,5 @@ export const rack: Rack = {
   'seq.bpm': 'BPM',
   'seq.title': 'Step Sequencer',
   'seq.play': 'Start the sequencer',
+  'seq.saveFailed': 'Pattern was not saved: storage is unavailable or full',
 }

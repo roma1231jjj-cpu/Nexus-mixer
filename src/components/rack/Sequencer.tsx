@@ -3,6 +3,7 @@ import { Play, Square, Music } from 'lucide-react'
 import { StepSequencerState, createSequencer, toggleStep, STEPS } from '../../lib/sequencer'
 import { loadSequencerPattern, saveSequencerPattern } from '../../lib/soundBank'
 import { useT } from '../../i18n'
+import { useUi } from '../../store/useUi'
 
 interface SequencerProps {
   sampleIds: string[]
@@ -15,6 +16,7 @@ interface SequencerProps {
 
 export function Sequencer({ sampleIds, sampleNames, sampleColors, onTrigger, onStop }: SequencerProps) {
   const t = useT()
+  const notify = useUi((s) => s.notify)
   const [seq, setSeq] = useState<StepSequencerState>(() => {
     const base = createSequencer()
     const stored = loadSequencerPattern()
@@ -99,8 +101,9 @@ export function Sequencer({ sampleIds, sampleNames, sampleColors, onTrigger, onS
   useEffect(() => {
     if (!saveSequencerPattern(seq.pattern, seq.bpm, seq.swing)) {
       // Storage can be full or disabled; the pattern still works this session.
+      notify(t('seq.saveFailed'))
     }
-  }, [seq.pattern, seq.bpm, seq.swing])
+  }, [seq.pattern, seq.bpm, seq.swing, notify])
 
   const handleStart = () => {
     stepIndexRef.current = 0

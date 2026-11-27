@@ -691,7 +691,7 @@ impl Session {
     /// last one in it, the next frame is the first one in the new file.
     fn roll(&mut self, reason: RollReason) -> Result<RollEvent, String> {
         self.flush()?;
-        self.writer.finalize();
+        self.writer.finalize()?;
         // The segment counter only advances once the new file really exists.
         let next = self.segment + 1;
         let (writer, path) = self.writer.reopen(self.base, next)?;
@@ -734,7 +734,11 @@ impl Session {
                 error = Some(flush_error);
             }
         }
-        self.writer.finalize();
+        if let Err(finalize_error) = self.writer.finalize() {
+            if error.is_none() {
+                error = Some(finalize_error);
+            }
+        }
         (self.total_frames, error)
     }
 
@@ -915,29 +919,32 @@ impl WavWriter {
     /// Write the real data size into the header and leave the file cursor at the
     /// end of the payload, so a segment that receives more data afterwards (a
     /// drain after a failed roll) appends instead of overwriting the take.
-    fn finalize(&mut self) {
+    fn finalize(&mut self) -> Result<(), String> {
         if self.header_bytes == self.data_bytes {
-            return;
+            return Ok(());
         }
         self.header_bytes = self.data_bytes;
-        let _ = self.file.flush();
+        self.file.flush().map_err(|e| format!("flush WAV: {e}"))?;
         let file = self.file.get_mut();
-        let _ = write_header(
+        write_header(
             file,
             self.channels,
             self.spec.sample_rate,
             self.bits,
             self.format_tag,
             self.data_bytes,
-        );
-        let _ = file.seek(SeekFrom::Start(44 + self.data_bytes));
-        let _ = file.sync_all();
+        )
+        .map_err(|e| format!("header WAV: {e}"))?;
+        file.seek(SeekFrom::Start(44 + self.data_bytes))
+            .map_err(|e| format!("seek WAV: {e}"))?;
+        file.sync_all().map_err(|e| format!("sync WAV: {e}"))?;
+        Ok(())
     }
 }
 
 impl Drop for WavWriter {
     fn drop(&mut self) {
-        self.finalize();
+        let _ = self.finalize();
     }
 }
 
@@ -1268,7 +1275,7 @@ mod tests {
             session.writer.push_frame(&mut bytes, &frame);
         }
         session.writer.write_bytes(&bytes).expect("write");
-        session.writer.finalize();
+        session.writer.finalize().expect("finalize");
         assert_eq!(read_float_wav(Path::new(&path)).len(), 10);
 
         let mut bytes = Vec::new();
@@ -1277,7 +1284,7 @@ mod tests {
             session.writer.push_frame(&mut bytes, &frame);
         }
         session.writer.write_bytes(&bytes).expect("write");
-        session.writer.finalize();
+        session.writer.finalize().expect("finalize");
         drop(session);
 
         let samples = read_float_wav(Path::new(&path));

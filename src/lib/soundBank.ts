@@ -41,6 +41,8 @@ export interface SoundPadState {
   playing: boolean
   /** Voice belongs to the Rust engine (routed through the mixer graph). */
   engine: boolean
+  /** When the engine voice started; used to clear a silent one-shot. */
+  startedAt?: number
   /** Peak level 0..1 from the engine, or computed for the preview voice. */
   level: number
   /** Preview-only nodes. */

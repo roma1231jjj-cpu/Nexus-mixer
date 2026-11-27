@@ -270,6 +270,7 @@ export const rack = {
   'seq.bpm': 'Темп',
   'seq.title': 'Секвенсор',
   'seq.play': 'Запустить секвенсор',
+  'seq.saveFailed': 'Паттерн не сохранился: хранилище недоступно или переполнено',
 }
 
 export type Rack = typeof rack

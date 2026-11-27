@@ -70,7 +70,7 @@ export const chrome = {
   'status.stopTip': 'Остановить аудиодвижок',
   'status.apiTip': 'Аудио API',
   'status.rateTip': 'Частота / буфер',
-  'status.latencyTip': 'Задержка',
+  'status.latencyTip': 'Задержка (оценка)',
   'status.cpuTip': 'Загрузка ЦП',
   'status.xrunTip': 'Пропуски (должно быть 0)',
   'status.cable': 'кабель',

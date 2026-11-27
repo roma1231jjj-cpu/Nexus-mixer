@@ -146,9 +146,11 @@ function normalizeDevices(devices: AudioDevice[]): void {
       // assigns a device to one.
       if (cableNumber > 2 && !bus.deviceId) continue
       const expected = virtualOutputs.find((device) => cableIndex(device.name) === cableNumber)
-      // Do not replace a manual Bn assignment just because it is not the
-      // "expected" numbered cable; only migration or a missing/empty slot does.
-      const force = remapCables || !bus.deviceId || !known.has(bus.deviceId)
+      // Only the first-run migration may bind Bn to its numbered cable.
+      // An empty slot is a deliberate "off", and a temporarily missing manual
+      // assignment must return to the same device, not be replaced by the
+      // "expected" cable.
+      const force = remapCables
 
       if (expected && !usedOutputs.has(expected.id) && force) {
         usedOutputs.add(expected.id)
