@@ -50,7 +50,7 @@ export function SettingsDrawer() {
           <Settings size={16} className="accent" />
           <div>
             <h2>{t('settings.title')}</h2>
-            <div className="sub">Nexus-Mixer · v0.4.3</div>
+            <div className="sub">Nexus-Mixer · v0.5.3</div>
           </div>
           <button
             type="button"
@@ -221,7 +221,9 @@ export function SettingsDrawer() {
               </div>
               <div className="d-text">
                 {status.driver.installed
-                  ? status.driver.message
+                  ? status.driver.cableEndpoints.length > 0
+                    ? t('settings.cableActiveText', { names: status.driver.cableEndpoints.join(', ') })
+                    : t('settings.cableInstalledNoDevices')
                   : t('settings.cableMissingText')}
                 <br /><br />
                 <RichText text={t('settings.cableWhat')} />
@@ -380,7 +382,7 @@ export function SettingsDrawer() {
               <p>{t('settings.aboutText')}</p>
               <div className="about-meta">
                 <span>{t('brand.sign')}</span>
-                <span>0.4.3 · Tauri 2 · Rust</span>
+                <span>0.5.3 · Tauri 2 · Rust</span>
               </div>
               <button
                 type="button"

@@ -83,7 +83,7 @@ export function StatusBar() {
       </span>
 
       <span className="status-spacer" />
-      <span className="status-signature">Nexus-Mixer 0.4.3</span>
+      <span className="status-signature">Nexus-Mixer 0.5.3</span>
     </footer>
   )
 }

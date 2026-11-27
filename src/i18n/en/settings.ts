@@ -35,6 +35,9 @@ export const settings: Settings = {
     'Cable not found. The virtual buses run in emulation mode — the audio stays inside the app.',
   'settings.cableWhat':
     '**What is it?** Every virtual cable creates a pair of devices: **Input** (where Nexus sends audio) and **Output** (where apps pick it up as a microphone).',
+  'settings.cableActiveText': 'Virtual cable active: {names}.',
+  'settings.cableInstalledNoDevices':
+    'The virtual cable driver is installed, but its devices are not visible to the system: check Device Manager.',
   'settings.foundCables': 'Detected cables:',
   'settings.cableN': 'cable {n}',
   'settings.busMap': 'Bus assignment:',

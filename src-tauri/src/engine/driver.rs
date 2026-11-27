@@ -65,16 +65,19 @@ fn probe() -> DriverStatus {
         .map(|(name, _)| name.clone())
         .collect();
 
+    // Технический статус для подсказки в статус-баре. Пользовательские
+    // формулировки живут в i18n (settings.cableActiveText и соседние ключи),
+    // иначе русский текст протекал в английский интерфейс.
     let message = if !installed {
-        "Виртуальный кабель не найден. Установите Virtual Audio Cable (VAC) или VB-CABLE, чтобы виртуальные шины получили \
-         собственные устройства вывода и ввода."
+        "Virtual cable not found: install Virtual Audio Cable (VAC) or VB-CABLE so the \
+         virtual buses get their own output and input devices."
             .into()
     } else if cable_names.is_empty() {
-        "Драйвер виртуального кабеля установлен, но его устройства не видны системе: \
-         проверьте Диспетчер устройств."
+        "The virtual cable driver is installed, but its devices are not visible to the system: \
+         check Device Manager."
             .into()
     } else {
-        format!("Виртуальный кабель активен: {}.", cable_names.join(", "))
+        format!("Virtual cable active: {}.", cable_names.join(", "))
     };
 
     DriverStatus {
