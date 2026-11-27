@@ -261,6 +261,8 @@ export const rack: Rack = {
   'pad.restored': 'File attached: {name}',
   'pad.engineUploadFailed': 'The engine rejected the sample: {error}',
   'pad.engineFallback': 'The engine refused to play it ({error}) — using the system output',
+  'pad.engineNotReady': '"{name}" is still uploading to the engine — try again in a second',
+  'pad.enginePlayFailed': 'The engine could not start the sample: {error}',
   'pad.engineOn': 'Audio runs through the engine: {n} samples in the bank, routed to a strip, bus or master',
   'pad.engineOff': 'The engine is stopped: audio only reaches the system output, bypassing strips and buses',
   'pad.browserOnly': 'Browser preview: only the system output plays, strip routing is unavailable',

@@ -26,12 +26,14 @@ import { useT } from '../../i18n'
 
 let previewCtx: AudioContext | null = null
 let previewGain: GainNode | null = null
+let previewMaster = 1
 
 function getPreviewCtx(): AudioContext {
   if (!previewCtx || previewCtx.state === 'closed') {
     previewCtx = new AudioContext()
     previewGain = previewCtx.createGain()
-    previewGain.gain.value = 1
+    // The user may have moved the master slider before the first preview.
+    previewGain.gain.value = previewMaster
     previewGain.connect(previewCtx.destination)
   }
   if (previewCtx.state === 'suspended') void previewCtx.resume()
@@ -48,6 +50,7 @@ export function getSoundMasterVolume(): number {
 }
 
 export function setSoundMasterVolume(v: number) {
+  previewMaster = v
   if (previewGain) previewGain.gain.value = v
 }
 
@@ -86,6 +89,8 @@ export function SoundPlayer() {
   const engineRunningRef = useRef(engineRunning)
   /** Set once syncEngineBank exists; a late decode calls it again. */
   const syncEngineRef = useRef<() => void>(() => {})
+  const syncBusyRef = useRef(false)
+  const syncAgainRef = useRef(false)
 
   samplesRef.current = samples
   padStatesRef.current = padStates
@@ -178,14 +183,29 @@ export function SoundPlayer() {
   // engine comes back.
   const syncEngineBank = useCallback(async () => {
     if (!engineBridge.available) return
-    const loaded = await engineBridge.padLoaded()
-    const known = new Set(loaded.ok ? loaded.value ?? [] : [])
-    setEnginePads(Object.fromEntries([...known].map((id) => [id, true])))
-    for (const sample of samplesRef.current) {
-      if (known.has(sample.id)) continue
-      const buffer = buffersRef.current[sample.id]
-      if (!buffer) continue
-      await uploadToEngine(sample.id, buffer)
+    // Decoding and the mount/engine-start effects can call this at the same
+    // time. Serialise them: two uploads of one sample used to race and the
+    // slower response could overwrite the newer bank state.
+    if (syncBusyRef.current) {
+      syncAgainRef.current = true
+      return
+    }
+    syncBusyRef.current = true
+    try {
+      do {
+        syncAgainRef.current = false
+        const loaded = await engineBridge.padLoaded()
+        const known = new Set(loaded.ok ? loaded.value ?? [] : [])
+        setEnginePads(Object.fromEntries([...known].map((id) => [id, true])))
+        for (const sample of samplesRef.current) {
+          if (known.has(sample.id)) continue
+          const buffer = buffersRef.current[sample.id]
+          if (!buffer) continue
+          await uploadToEngine(sample.id, buffer)
+        }
+      } while (syncAgainRef.current)
+    } finally {
+      syncBusyRef.current = false
     }
   }, [uploadToEngine])
 
@@ -214,6 +234,9 @@ export function SoundPlayer() {
           /* already stopped */
         }
       })
+      // Engine voices outlive the React tree. Without this, closing the rack
+      // left a loop playing with no visible stop button.
+      if (engineBridge.available) void engineBridge.padStopAll()
       const ctx = previewCtx
       previewCtx = null
       previewGain = null
@@ -423,24 +446,31 @@ export function SoundPlayer() {
         setMissing((prev) => ({ ...prev, [sample.id]: true }))
         return false
       }
-      if (engineRunningRef.current && enginePads[sample.id]) {
+      if (engineRunningRef.current) {
+        if (!enginePads[sample.id]) {
+          // The engine is running, so a Web Audio preview would go to the
+          // system output and bypass the selected bus/recording. Wait for the
+          // upload instead and tell the user why nothing happened yet.
+          notify(t('pad.engineNotReady', { name: sample.name }))
+          syncEngineRef.current()
+          return false
+        }
         void engineBridge.padPlay(sample.id, paramsOf(sample, delayMs)).then((result) => {
           if (result.ok) {
             setPadState(sample.id, {
               playing: true,
               engine: true,
               level: 0,
-              startedAt: Date.now(),
+              startedAt: Date.now() + delayMs,
             })
             return
           }
-          // Engine refused (halted between polls, sample not uploaded, …):
-          // fall back to the preview bus and say so instead of silence.
-          notify(t('pad.engineFallback', { error: result.error ?? '' }))
-          startPreview(sample, buffer)
+          // Do not silently route around the mixer on an engine error.
+          notify(t('pad.enginePlayFailed', { error: result.error ?? '' }))
         })
         return true
       }
+      // Engine stopped: the preview bus is the only available output.
       startPreview(sample, buffer)
       return true
     },
@@ -539,41 +569,75 @@ export function SoundPlayer() {
   useEffect(() => {
     if (!engineBridge.available || !engineRunning) return
     const timer = window.setInterval(() => {
-      void engineBridge.padLevels().then((result) => {
-        if (!result.ok || !result.value) return
-        const levels = result.value
-        setPadStates((prev) => {
-          let changed = false
-          const next: Record<string, SoundPadState> = { ...prev }
-          for (const id of Object.keys(next)) {
-            const state = next[id]
-            if (!state.engine) continue
-            const level = levels[id] ?? 0
-            const sample = samplesRef.current.find((item) => item.id === id)
-            const elapsed = state.startedAt ? Date.now() - state.startedAt : 0
-            // A silent or very short one-shot may end between two polls while
-            // its peak never became > 0. Fall back to the sample duration so
-            // the pad cannot stay "playing" forever.
-            const finished =
-              Boolean(sample) &&
-              !sample?.loop &&
-              (sample?.duration ?? 0) > 0 &&
-              elapsed > (sample?.duration ?? 0) * 1000 + 250
-            if (level > 0 && !state.playing) {
-              next[id] = { ...state, playing: true, level, startedAt: state.startedAt ?? Date.now() }
-              changed = true
-            } else if ((level <= 0 && state.level > 0) || finished) {
-              // One-shot finished: the engine no longer reports a peak.
-              next[id] = { ...state, playing: false, level: 0, startedAt: undefined }
-              changed = true
-            } else if (Math.abs(level - state.level) > 0.01) {
-              next[id] = { ...state, level }
-              changed = true
+      void Promise.all([engineBridge.padLevels(), engineBridge.padActive()]).then(
+        ([levelResult, activeResult]) => {
+          if (!levelResult.ok && !activeResult.ok) return
+          const levels = levelResult.ok ? levelResult.value ?? {} : {}
+          const activeIds =
+            activeResult.ok && activeResult.value ? new Set(activeResult.value) : null
+          setPadStates((prev) => {
+            let changed = false
+            const next: Record<string, SoundPadState> = { ...prev }
+            if (activeIds) {
+              // active is authoritative: a silent loop is still playing, and
+              // a one-shot that ended at zero peak is no longer playing.
+              const sampleIds = new Set(samplesRef.current.map((sample) => sample.id))
+              for (const id of activeIds) {
+                if (!sampleIds.has(id) && !next[id]) continue
+                const state = next[id] ?? EMPTY_PAD_STATE
+                const level = levels[id] ?? 0
+                if (!state.playing || !state.engine || Math.abs(level - state.level) > 0.01) {
+                  next[id] = {
+                    ...state,
+                    playing: true,
+                    engine: true,
+                    level,
+                    startedAt: state.startedAt,
+                  }
+                  changed = true
+                }
+              }
+              for (const id of Object.keys(next)) {
+                const state = next[id]
+                if (!state.engine || activeIds.has(id)) continue
+                // pad_play is processed at the next audio block; do not blink
+                // a just-triggered (or delayed sequencer) pad off immediately.
+                const pending = state.startedAt ? Date.now() < state.startedAt + 500 : false
+                if (pending) continue
+                if (state.playing || state.level > 0) {
+                  next[id] = { ...state, playing: false, level: 0, startedAt: undefined }
+                  changed = true
+                }
+              }
+              return changed ? next : prev
             }
-          }
-          return changed ? next : prev
-        })
-      })
+            // Older engine without pad_active: peak/duration fallback.
+            for (const id of Object.keys(next)) {
+              const state = next[id]
+              if (!state.engine) continue
+              const level = levels[id] ?? 0
+              const sample = samplesRef.current.find((item) => item.id === id)
+              const elapsed = state.startedAt ? Date.now() - state.startedAt : 0
+              const finished =
+                Boolean(sample) &&
+                !sample?.loop &&
+                (sample?.duration ?? 0) > 0 &&
+                elapsed > (sample?.duration ?? 0) * 1000 + 250
+              if (level > 0 && !state.playing) {
+                next[id] = { ...state, playing: true, level, startedAt: state.startedAt ?? Date.now() }
+                changed = true
+              } else if ((level <= 0 && state.level > 0) || finished) {
+                next[id] = { ...state, playing: false, level: 0, startedAt: undefined }
+                changed = true
+              } else if (Math.abs(level - state.level) > 0.01) {
+                next[id] = { ...state, level }
+                changed = true
+              }
+            }
+            return changed ? next : prev
+          })
+        },
+      )
     }, 120)
     return () => window.clearInterval(timer)
   }, [engineRunning])

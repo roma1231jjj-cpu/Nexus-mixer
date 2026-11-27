@@ -281,6 +281,11 @@ fn pad_loaded(state: SharedEngine<'_>) -> Vec<String> {
     state.pads().loaded()
 }
 
+#[tauri::command]
+fn pad_active(state: SharedEngine<'_>) -> Vec<String> {
+    state.pads().active()
+}
+
 /// Rename detected virtual cable endpoints to `Nexus Cable B1..B12`.
 ///
 /// The endpoint properties live under HKLM, so the script is launched through
@@ -531,6 +536,7 @@ pub fn run() {
             pad_stop_all,
             pad_levels,
             pad_loaded,
+            pad_active,
         ])
         .setup(|app| {
             let state = app.state::<Arc<EngineState>>();

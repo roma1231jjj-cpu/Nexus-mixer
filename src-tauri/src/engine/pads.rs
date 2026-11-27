@@ -11,7 +11,7 @@
 //! renderer only advances preallocated voices.
 
 use std::collections::{BTreeMap, HashMap};
-use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use crossbeam_channel::{unbounded, Receiver, Sender, TryRecvError};
@@ -122,6 +122,7 @@ pub enum PadCommand {
         sample_rate: f32,
         params: PadParams,
         level: Arc<AtomicU32>,
+        playing: Arc<AtomicBool>,
     },
     Update {
         key: u64,
@@ -143,6 +144,7 @@ struct Voice {
     params: PadParams,
     delay: u32,
     level: Arc<AtomicU32>,
+    playing: Arc<AtomicBool>,
     peak: f32,
     active: bool,
     started_at: u64,
@@ -156,6 +158,7 @@ impl Voice {
         out_rate: f32,
         params: PadParams,
         level: Arc<AtomicU32>,
+        playing: Arc<AtomicBool>,
         serial: u64,
     ) -> Self {
         let frames = pcm.len() / 2;
@@ -179,6 +182,7 @@ impl Voice {
             params,
             delay: params.delay_frames,
             level,
+            playing,
             peak: 0.0,
             active: frames > 1,
             started_at: serial,
@@ -277,6 +281,7 @@ impl PadRenderer {
                 sample_rate,
                 params,
                 level,
+                playing,
             } => {
                 let params = params.sanitized();
                 // Retrigger: a second hit restarts the same pad instead of
@@ -291,6 +296,7 @@ impl PadRenderer {
                         self.out_rate,
                         params,
                         level,
+                        playing,
                         self.serial,
                     );
                     return;
@@ -315,6 +321,7 @@ impl PadRenderer {
                     self.out_rate,
                     params,
                     level,
+                    playing,
                     self.serial,
                 ));
             }
@@ -394,6 +401,9 @@ impl PadRenderer {
             let peak = if voice.active { voice.peak } else { 0.0 };
             voice.peak = 0.0;
             voice.level.store(peak.to_bits(), Ordering::Relaxed);
+            // Authoritative playback state for the UI. Peak levels stay at
+            // zero for silent loops, so they cannot answer "is it playing?".
+            voice.playing.store(voice.active, Ordering::Relaxed);
         }
         self.voices.retain(|voice| voice.active);
     }
@@ -414,6 +424,7 @@ struct PadEntry {
     sample_rate: f32,
     params: PadParams,
     level: Arc<AtomicU32>,
+    playing: Arc<AtomicBool>,
     bytes: usize,
 }
 
@@ -454,6 +465,7 @@ impl PadBank {
         *self.sender.lock() = None;
         for entry in self.entries.read().values() {
             entry.level.store(0.0_f32.to_bits(), Ordering::Relaxed);
+            entry.playing.store(false, Ordering::Relaxed);
         }
     }
 
@@ -533,6 +545,7 @@ impl PadBank {
             },
             params: PadParams::default(),
             level: Arc::new(AtomicU32::new(0.0_f32.to_bits())),
+            playing: Arc::new(AtomicBool::new(false)),
             bytes,
         };
         self.bytes.store(projected, Ordering::Relaxed);
@@ -560,6 +573,7 @@ impl PadBank {
             sample_rate: entry.sample_rate,
             params: params.sanitized(),
             level: Arc::clone(&entry.level),
+            playing: Arc::clone(&entry.playing),
         };
         drop(guard);
         self.send(command)?;
@@ -610,6 +624,19 @@ impl PadBank {
                 }
             })
             .collect()
+    }
+
+    /// Pads whose voice is currently sounding, including silent loop tails.
+    pub fn active(&self) -> Vec<String> {
+        let mut ids: Vec<String> = self
+            .entries
+            .read()
+            .iter()
+            .filter(|(_, entry)| entry.playing.load(Ordering::Relaxed))
+            .map(|(id, _)| id.clone())
+            .collect();
+        ids.sort();
+        ids
     }
 
     pub fn loaded(&self) -> Vec<String> {

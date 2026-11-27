@@ -15,6 +15,25 @@ import { applyAiStatus, applyEngineStatus, refreshEngineInfo, restartEngine } fr
  */
 const CABLE_PLAN_KEY = 'nexus.cablePlan.v5'
 
+/**
+ * Browser/demo goals from 0.3-0.4 were stored as real assignments. They must
+ * be migrated even when the cable-plan key already exists, otherwise a user
+ * updating from an old profile keeps a microphone endpoint that never existed.
+ * Real Windows ids contain a runtime/device hash and are not in this list.
+ */
+const LEGACY_DEMO_IDS = new Set([
+  'in:mic-usb',
+  'in:line',
+  'in:vaio-out',
+  'in:aux-out',
+  'in:mic',
+  'out:speakers',
+  'out:headphones',
+  'out:vaio',
+  'out:aux',
+  'out:cable',
+])
+
 /** `Nexus Cable B7 …` -> 7; anything else (legacy VB-CABLE, 16ch) -> null. */
 function cableIndex(name: string): number | null {
   const match = name.match(/Nexus Cable B(\d+)/i)
@@ -72,7 +91,7 @@ function normalizeDevices(devices: AudioDevice[]): void {
   const strips = { ...state.strips }
   const visibleStrips = new Set<StripId>(STRIP_ORDER.slice(0, state.sourceCount))
   for (const id of STRIP_ORDER) {
-    const strip = strips[id]
+    let strip = strips[id]
     if (!visibleStrips.has(id)) {
       // Slots beyond the visible source count must not hold capture streams:
       // opening an endpoint for an invisible channel steals it from the slot
@@ -84,9 +103,20 @@ function normalizeDevices(devices: AudioDevice[]): void {
       continue
     }
 
+    // Old demo profiles stored ids like in:mic-usb. Treat those as empty so
+    // the real default endpoint can take the slot, without touching a real
+    // assignment that is merely unplugged.
+    const hadLegacy = Boolean(strip.deviceId && LEGACY_DEMO_IDS.has(strip.deviceId))
+    if (hadLegacy) {
+      strip = { ...strip, deviceId: '' }
+      strips[id] = strip
+      stripsChanged = true
+    }
+    const allowFirstRun = remapCables || hadLegacy
+
     // Virtual strips read the matching numbered cable: System <- B1,
     // Game <- B2. This is a one-time migration, not a permanent override.
-    const virtualSlot = remapCables ? (id === 'vaio' ? 1 : id === 'aux' ? 2 : null) : null
+    const virtualSlot = allowFirstRun ? (id === 'vaio' ? 1 : id === 'aux' ? 2 : null) : null
     if (virtualSlot !== null) {
       const expected = virtualInputs.find((device) => cableIndex(device.name) === virtualSlot)
       if (expected && !usedInputs.has(expected.id)) {
@@ -115,7 +145,7 @@ function normalizeDevices(devices: AudioDevice[]): void {
     // empty slot on each device refresh.
     if (!strip.deviceId) {
       const pool = id === 'vaio' || id === 'aux' ? virtualInputs : physicalInputs
-      const preferred = remapCables
+      const preferred = allowFirstRun
         ? id === 'hw1'
           ? pool.find((device) => device.isDefault)
           : undefined
@@ -136,7 +166,14 @@ function normalizeDevices(devices: AudioDevice[]): void {
   let busesChanged = false
   const buses = { ...state.buses }
   for (const id of BUS_ORDER) {
-    const bus = buses[id as BusId]
+    let bus = buses[id as BusId]
+    const hadLegacy = Boolean(bus.deviceId && LEGACY_DEMO_IDS.has(bus.deviceId))
+    if (hadLegacy) {
+      bus = { ...bus, deviceId: '' }
+      buses[id as BusId] = bus
+      busesChanged = true
+    }
+    const allowFirstRun = remapCables || hadLegacy
 
     if (id.startsWith('B')) {
       const cableNumber = Number(id.slice(1))
@@ -150,7 +187,7 @@ function normalizeDevices(devices: AudioDevice[]): void {
       // An empty slot is a deliberate "off", and a temporarily missing manual
       // assignment must return to the same device, not be replaced by the
       // "expected" cable.
-      const force = remapCables
+      const force = allowFirstRun
 
       if (expected && !usedOutputs.has(expected.id) && force) {
         usedOutputs.add(expected.id)
@@ -170,7 +207,7 @@ function normalizeDevices(devices: AudioDevice[]): void {
       // lines exist at all. With partial VAC enumeration, never shift the
       // remaining cables onto the wrong B numbers — leave the slot empty and
       // fill it when that line appears.
-      if (!expected && numberedCables.size === 0 && !bus.deviceId) {
+      if (!expected && numberedCables.size === 0 && !bus.deviceId && allowFirstRun) {
         const legacy = virtualOutputs.find((device) => cableIndex(device.name) === null)
         if (legacy && !usedOutputs.has(legacy.id)) {
           usedOutputs.add(legacy.id)
@@ -196,7 +233,7 @@ function normalizeDevices(devices: AudioDevice[]): void {
     }
 
     const pool = physicalOutputs
-    const forceMaster = remapCables && id === 'A1'
+    const forceMaster = allowFirstRun && id === 'A1'
     if (!forceMaster && bus.deviceId && known.has(bus.deviceId) && !usedOutputs.has(bus.deviceId)) {
       usedOutputs.add(bus.deviceId)
       continue
@@ -237,7 +274,10 @@ function normalizeDevices(devices: AudioDevice[]): void {
 
   if (stripsChanged) useMixer.setState({ strips })
   if (busesChanged) useMixer.setState({ buses })
-  if (remapCables) {
+  // Only finish the first-run migration after both an input and an output
+  // were visible. A boot where Windows has not enumerated the microphone yet
+  // must not lock hw1 empty forever.
+  if (remapCables && physicalInputs.length > 0 && physicalOutputs.length > 0) {
     try {
       localStorage.setItem(CABLE_PLAN_KEY, '1')
     } catch {
@@ -300,12 +340,13 @@ export function useEngineBridge(): void {
       void engineBridge.setMixerState(snapshotOf(state))
     }
 
-    const maybeRestart = (reason: string, force = false) => {
-      if (restarting || cancelled) return
+    /** Returns false when the restart was skipped and must be retried later. */
+    const maybeRestart = (reason: string, force = false): boolean => {
+      if (restarting || cancelled) return false
       const state = useMixer.getState()
-      if (!state.status.running) return
+      if (!state.status.running) return true
       const now = performance.now()
-      if (!force && now - lastRestartAt < 15_000) return
+      if (!force && now - lastRestartAt < 15_000) return false
       lastRestartAt = now
       restarting = true
       useUi.getState().notify(t('engine.restart', { reason }))
@@ -315,6 +356,7 @@ export function useEngineBridge(): void {
           useUi.getState().notify(result.error ?? t('engine.restartFailed'))
         }
       })
+      return true
     }
 
     const refreshDevices = () => {
@@ -344,7 +386,7 @@ export function useEngineBridge(): void {
         // A device that came back needs a graph rebuild too: normalization
         // kept its id while it was gone, so the plan did not change.
         const returned = [...missingDevices].filter((id) => known.has(id) && referenced.includes(id))
-        missingDevices = new Set(lost)
+        const needsRestart = lost.length > 0 || returned.length > 0
 
         normalizeDevices(devices)
         useMixer.setState({ devices })
@@ -367,8 +409,13 @@ export function useEngineBridge(): void {
           }
         }
 
-        if ((lost.length > 0 || returned.length > 0) && devices.length > 0) {
-          maybeRestart(t('engine.reasonLost'))
+        if (needsRestart && devices.length > 0) {
+          // Keep the old missing set when the restart was throttled or another
+          // restart is in flight. Clearing it here made a returned microphone
+          // a one-shot event that could be lost before the graph was rebuilt.
+          if (maybeRestart(t('engine.reasonLost'))) missingDevices = new Set(lost)
+        } else {
+          missingDevices = new Set(lost)
         }
       })
     }

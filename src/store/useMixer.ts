@@ -101,10 +101,33 @@ const migrateColor = (color: string): string => LEGACY_COLORS[color.toLowerCase(
 let panicSnapshot: Record<StripId, boolean> | null = null
 
 /** Per-macro state captured while a momentary macro is held. */
-const momentarySnapshots = new Map<
-  string,
-  { strips: Record<StripId, Strip>; ai: MixerState['ai']; action: MacroAction }
->()
+interface MomentarySnapshot {
+  strips: Record<StripId, Strip>
+  ai: MixerState['ai']
+  action: MacroAction
+  /** Preset macros resolve their target when pressed; store it for release. */
+  presetTargetId?: StripId
+  /** AI keys a preset actually changed, so release does not clobber other fields. */
+  aiKeys?: string[]
+}
+
+const momentarySnapshots = new Map<string, MomentarySnapshot>()
+
+/** Same target/action: the second press must share the first baseline. */
+function sameMomentaryTarget(a: MacroAction, b: MacroAction): boolean {
+  if (a.type !== b.type) return false
+  if (a.type === 'panic' || a.type === 'ai') return true
+  if (a.type === 'route') return a.target === b.target && a.bus === b.bus
+  if (a.type === 'preset') return a.target === b.target && a.value === b.value
+  return a.target === b.target
+}
+
+/** A held macro that owns the same mute state as this strip. */
+function muteOwnedByHeld(stripId: StripId, held: MomentarySnapshot[]): boolean {
+  return held.some(
+    (snap) => snap.action.type === 'panic' || (snap.action.type === 'mute' && snap.action.target === stripId),
+  )
+}
 
 const applyTheme = (theme: Theme) => {
   document.documentElement.dataset.theme = theme
@@ -409,12 +432,52 @@ export const useMixer = create<MixerStore>()(
       },
 
       pressMacro: (id) => {
+        if (momentarySnapshots.has(id)) return
         const state = get()
         const macro = state.macros.find((m) => m.id === id)
         if (!macro) return
+        const held = [...momentarySnapshots.values()]
+        const same = held.find((snap) => sameMomentaryTarget(snap.action, macro.action))
+        let baseStrips = same?.strips ?? state.strips
+        const baseAi = same?.ai ?? state.ai
+        // A second macro starts from the first macro's baseline, not from the
+        // value the first macro just applied. Otherwise releasing the pair in
+        // the wrong order makes the original value disappear.
+        if (macro.action.type === 'panic' && !same) {
+          for (const snap of held) {
+            if (snap.action.type !== 'mute' || !snap.action.target) continue
+            const target = snap.action.target
+            baseStrips = {
+              ...baseStrips,
+              [target]: { ...baseStrips[target], mute: snap.strips[target]?.mute ?? baseStrips[target].mute },
+            }
+          }
+        }
+        if (macro.action.type === 'mute' && macro.action.target && !same) {
+          const panic = held.find((snap) => snap.action.type === 'panic')
+          if (panic) {
+            const target = macro.action.target
+            baseStrips = {
+              ...baseStrips,
+              [target]: { ...baseStrips[target], mute: panic.strips[target]?.mute ?? baseStrips[target].mute },
+            }
+          }
+        }
+        const preset =
+          macro.action.type === 'preset' && typeof macro.action.value === 'string'
+            ? state.presets.find((item) => item.id === macro.action.value)
+            : undefined
+        const presetTargetId =
+          macro.action.type === 'preset' ? macro.action.target ?? state.selectedStripId : undefined
         // A held macro behaves like a hardware button: it *activates* its
         // action, and releasing restores exactly what was there before.
-        momentarySnapshots.set(id, { strips: state.strips, ai: state.ai, action: macro.action })
+        momentarySnapshots.set(id, {
+          strips: baseStrips,
+          ai: baseAi,
+          action: macro.action,
+          presetTargetId,
+          aiKeys: preset?.ai ? Object.keys(preset.ai) : undefined,
+        })
         const action = macro.action
         switch (action.type) {
           case 'panic': {
@@ -455,37 +518,51 @@ export const useMixer = create<MixerStore>()(
         const snapshot = momentarySnapshots.get(id)
         if (!snapshot) return
         momentarySnapshots.delete(id)
+        const held = [...momentarySnapshots.values()]
         const action = snapshot.action
-        // A momentary button owns only the parameters it changed; restoring the
-        // whole strip map would silently undo unrelated edits made while held.
+        // Restore only the fields this macro owns. A field another held macro
+        // still owns must keep that macro's value, not this snapshot's.
         if (action.type === 'panic') {
+          if (held.some((snap) => snap.action.type === 'panic')) return
           set((current) => ({
             strips: Object.fromEntries(
-              Object.entries(current.strips).map(([key, strip]) => [
-                key,
-                { ...strip, mute: snapshot.strips[key as StripId]?.mute ?? strip.mute },
-              ]),
+              Object.entries(current.strips).map(([key, strip]) => {
+                const stripId = key as StripId
+                if (muteOwnedByHeld(stripId, held)) return [key, strip]
+                return [key, { ...strip, mute: snapshot.strips[stripId]?.mute ?? strip.mute }]
+              }),
             ) as Record<StripId, Strip>,
           }))
           return
         }
-        if (action.type === 'mute' || action.type === 'gain') {
-          if (!action.target) return
+        if (action.type === 'mute') {
+          if (!action.target || muteOwnedByHeld(action.target, held)) return
           const before = snapshot.strips[action.target]
           if (!before) return
           set((current) => ({
             strips: {
               ...current.strips,
-              [action.target as StripId]: {
-                ...current.strips[action.target as StripId],
-                ...(action.type === 'mute' ? { mute: before.mute } : { gainDb: before.gainDb }),
-              },
+              [action.target as StripId]: { ...current.strips[action.target as StripId], mute: before.mute },
+            },
+          }))
+          return
+        }
+        if (action.type === 'gain') {
+          if (!action.target) return
+          if (held.some((snap) => snap.action.type === 'gain' && snap.action.target === action.target)) return
+          const before = snapshot.strips[action.target]
+          if (!before) return
+          set((current) => ({
+            strips: {
+              ...current.strips,
+              [action.target as StripId]: { ...current.strips[action.target as StripId], gainDb: before.gainDb },
             },
           }))
           return
         }
         if (action.type === 'route') {
           if (!action.target || !action.bus) return
+          if (held.some((snap) => snap.action.type === 'route' && snap.action.target === action.target && snap.action.bus === action.bus)) return
           const before = snapshot.strips[action.target]?.routing[action.bus]
           if (!before) return
           set((current) => {
@@ -503,11 +580,31 @@ export const useMixer = create<MixerStore>()(
           return
         }
         if (action.type === 'ai') {
-          set({ ai: snapshot.ai })
+          if (held.some((snap) => snap.action.type === 'ai' || (snap.aiKeys?.length ?? 0) > 0)) return
+          set((current) => ({ ai: { ...current.ai, enabled: snapshot.ai.enabled } }))
           return
         }
-        // Presets may touch many fields; fall back to the full snapshot.
-        set({ strips: snapshot.strips, ai: snapshot.ai })
+        if (action.type === 'preset') {
+          const target = snapshot.presetTargetId
+          if (!target) return
+          if (held.some((snap) => snap.action.type === 'preset' && snap.presetTargetId === target)) return
+          const before = snapshot.strips[target]
+          if (!before) return
+          const restoreAi =
+            (snapshot.aiKeys?.length ?? 0) > 0 &&
+            !held.some((snap) => snap.action.type === 'ai' || (snap.aiKeys?.length ?? 0) > 0)
+          set((current) => {
+            const strips = {
+              ...current.strips,
+              [target]: { ...current.strips[target], fx: structuredClone(before.fx), aiPresetId: before.aiPresetId },
+            }
+            if (!restoreAi) return { strips }
+            const ai = { ...current.ai } as unknown as Record<string, unknown>
+            const beforeAi = snapshot.ai as unknown as Record<string, unknown>
+            for (const key of snapshot.aiKeys ?? []) ai[key] = beforeAi[key]
+            return { strips, ai: ai as unknown as MixerState['ai'] }
+          })
+        }
       },
 
       setVcaGain: (groupId, gainDb) =>

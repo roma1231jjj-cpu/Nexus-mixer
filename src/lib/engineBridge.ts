@@ -236,6 +236,11 @@ export const engineBridge = {
     return callResult<string[]>('pad_loaded')
   },
 
+  /** Ids with a live voice, including loops whose peak is currently zero. */
+  padActive(): Promise<CallResult<string[]>> {
+    return callResult<string[]>('pad_active')
+  },
+
   /** Method with its own error channel, for callers that must not guess. */
   callResult,
 }
